@@ -1,0 +1,53 @@
+
+- hosts: hotes_cible
+  become: yes
+
+  tasks:
+    - name: ensure basic dependencies are present
+      apt:
+        name:
+          - apache2
+          - git
+          - perl
+        state: present
+        update_cache: yes
+
+    - name: Git clone/update webapp
+      git:
+        repo: "https://github.com/e-lie/flask_hello_ansible.git"
+        dest: /var/www/html/webapp
+        version: "master"
+        clone: yes
+        update: no
+
+    - name: Create /var/www/html directory
+      file:
+        path: /var/www/html
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+
+    - name: Remove default index.html
+      file:
+        path: /var/www/html/index.html
+        state: absent
+
+    - name: Update permissions of webapp directory
+      file:
+        path: /var/www/html/webapp
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+        recurse: yes
+
+    - name: Verify Apache is enabled
+      systemd:
+        name: apache2
+        enabled: yes
+
+    - name: Ensure Apache service started
+      systemd:
+        name: apache2
+        state: started
