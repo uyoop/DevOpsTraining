@@ -1,0 +1,86 @@
+---
+# appserver/tasks/main.yml - Installation et configuration de PHP avec l'application Covoiturage
+
+- name: Install PHP and required modules
+  apt:
+    name:
+      - php
+      - php-fpm
+      - php-mysql
+      - php-mbstring
+      - php-xml
+      - php-curl
+      - libapache2-mod-php
+    state: present
+  tags:
+    - appserver
+    - install
+    - php
+
+- name: Ensure PHP-FPM service is enabled and started
+  systemd:
+    name: php8.3-fpm
+    enabled: yes
+    state: started
+  tags:
+    - appserver
+    - service
+
+- name: Create application user
+  user:
+    name: "{{ app.user }}"
+    state: present
+    create_home: yes
+    groups:
+      - www-data
+  tags:
+    - appserver
+    - config
+
+- name: Create application directory
+  file:
+    path: "{{ app.install_path }}"
+    state: directory
+    owner: "{{ app.user }}"
+    group: www-data
+    mode: 0755
+  tags:
+    - appserver
+    - config
+
+- name: Copy Covoiturage application files
+  copy:
+    src: "{{ playbook_dir }}/Covoiturage/"
+    dest: "{{ app.install_path }}/"
+    owner: "{{ app.user }}"
+    group: www-data
+    mode: 0644
+  tags:
+    - appserver
+    - deploy
+
+- name: Create database configuration from template
+  template:
+    src: db.php.j2
+    dest: "{{ app.install_path }}/db.php"
+    owner: "{{ app.user }}"
+    group: www-data
+    mode: 0640
+  tags:
+    - appserver
+    - deploy
+    - config
+    - security
+
+- name: Set correct permissions on application directory
+  file:
+    path: "{{ app.install_path }}"
+    state: directory
+    owner: "{{ app.user }}"
+    group: www-data
+    recurse: yes
+    mode: 0755
+  tags:
+    - appserver
+    - config
+    - security

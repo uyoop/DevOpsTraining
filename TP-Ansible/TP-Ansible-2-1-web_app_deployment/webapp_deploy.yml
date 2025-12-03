@@ -1,0 +1,60 @@
+---
+# webapp_deploy.yml - Deployment playbook for Covoiturage PHP application
+- name: Deploy Covoiturage PHP application with Apache and MySQL
+  hosts: appservers
+  become: true
+  
+  pre_tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      tags:
+        - always
+  
+  roles:
+    - role: common
+      tags: common
+    - role: database
+      tags: database
+    - role: appserver
+      tags: appserver
+    - role: webserver
+      tags: webserver
+  
+  post_tasks:
+    - name: Verify deployment - Check Apache status
+      systemd:
+        name: apache2
+        state: started
+      register: apache_status
+      failed_when: apache_status.failed
+      tags:
+        - verify
+        - webserver
+      
+    - name: Verify deployment - Check MySQL status
+      systemd:
+        name: mysql
+        state: started
+      register: mysql_status
+      failed_when: mysql_status.failed
+      tags:
+        - verify
+        - database
+    
+    - name: Verify deployment - Check PHP-FPM status
+      systemd:
+        name: php8.3-fpm
+        state: started
+      register: php_status
+      failed_when: php_status.failed
+      tags:
+        - verify
+        - appserver
+    
+    - name: Display deployment success message
+      debug:
+        msg: "Déploiement réussi ! L'application Covoiturage est accessible sur http://{{ app.domain }}"
+      tags:
+        - verify

@@ -1,0 +1,47 @@
+.
+├── ~
+│   └── gitdata
+│       └── TP-Ansible
+├── ansible.cfg
+├── Covoiturage
+│   ├── db.php
+│   ├── index.php
+│   ├── schema.sql
+│   └── style.css
+├── group_vars
+│   ├── appservers.yml
+│   └── vault.yml
+├── GUIDE_DEPLOIEMENT.md
+├── inventory.ini
+├── Makefile
+├── README.md
+├── roles
+│   ├── appserver
+│   │   ├── handlers
+│   │   ├── meta
+│   │   ├── tasks
+│   │   └── templates
+│   ├── common
+│   │   ├── handlers
+│   │   ├── meta
+│   │   └── tasks
+│   ├── database
+│   │   ├── handlers
+│   │   ├── meta
+│   │   ├── tasks
+│   │   └── templates
+│   └── webserver
+│       ├── handlers
+│       ├── meta
+│       ├── tasks
+│       └── templates
+├── ROLES_DOCUMENTATION.md
+├── setup_vault.sh
+├── STRUCTURE.txt
+├── test_connectivity.yml
+├── Vagrantfile
+├── verify_deployment.yml
+├── webapp_deploy.yml
+└── webservers.yml
+
+26 directories, 19 files

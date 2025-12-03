@@ -1,0 +1,9 @@
+---
+# webserver/meta/main.yml
+
+dependencies: []
+
+galaxy_info:
+  author: AFPA DevOps
+  description: Apache web server configuration for Covoiturage application
+  min_ansible_version: 2.9

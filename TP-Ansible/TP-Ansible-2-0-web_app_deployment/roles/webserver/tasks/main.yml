@@ -1,0 +1,121 @@
+---
+# webserver/tasks/main.yml - Tâches pour déployer l'application web Flask
+
+- name: Ensure nginx is installed and started
+  apt:
+    name: nginx
+    state: present
+
+- name: Ensure nginx service is enabled and started
+  systemd:
+    name: nginx
+    enabled: yes
+    state: started
+
+- name: Add the user running webapp
+  user:
+    name: "{{ app.user }}"
+    state: present
+    create_home: yes
+    groups:
+      - "www-data"
+
+- name: Clone application repository
+  git:
+    repo: "{{ app.repo_url }}"
+    dest: "/home/{{ app.user }}/repo"
+    version: "{{ app.repo_version }}"
+    update: yes
+  become_user: "{{ app.user }}"
+
+- name: Move app to final location (handle subdirectory if needed)
+  command: |
+    bash -c "
+    if [ -d '/home/{{ app.user }}/repo/{{ app.repo_path }}' ]; then
+      cp -r '/home/{{ app.user }}/repo/{{ app.repo_path }}' '/home/{{ app.user }}/{{ app.name }}_tmp'
+      rm -rf '/home/{{ app.user }}/repo'
+      mv '/home/{{ app.user }}/{{ app.name }}_tmp' '/home/{{ app.user }}/{{ app.name }}'
+    elif [ -d '/home/{{ app.user }}/repo' ]; then
+      if [ -f '/home/{{ app.user }}/repo/wsgi.py' ] || [ -f '/home/{{ app.user }}/repo/app.py' ]; then
+        mv '/home/{{ app.user }}/repo' '/home/{{ app.user }}/{{ app.name }}'
+      else
+        echo 'Error: wsgi.py or app.py not found in repo'
+        exit 1
+      fi
+    else
+      echo 'Error: repo directory not found'
+      exit 1
+    fi
+    "
+  args:
+    executable: /bin/bash
+  become_user: "{{ app.user }}"
+
+- name: Create virtualenv if missing
+  command: python3 -m venv "/home/{{ app.user }}/{{ app.name }}/venv"
+  args:
+    creates: "/home/{{ app.user }}/{{ app.name }}/venv/bin/activate"
+  become_user: "{{ app.user }}"
+
+- name: Upgrade pip in venv
+  pip:
+    name: pip
+    virtualenv: "/home/{{ app.user }}/{{ app.name }}/venv"
+    virtualenv_python: python3
+  become_user: "{{ app.user }}"
+
+- name: Install python dependencies for the webapp in the virtualenv
+  pip:
+    requirements: "/home/{{ app.user }}/{{ app.name }}/requirements.txt"
+    virtualenv: "/home/{{ app.user }}/{{ app.name }}/venv"
+    virtualenv_python: python3
+  become_user: "{{ app.user }}"
+  async: 600
+  poll: 30
+
+- name: Change permissions of app directory
+  file:
+    path: "/home/{{ app.user }}/{{ app.name }}"
+    state: directory
+    owner: "{{ app.user }}"
+    group: "www-data"
+    recurse: true
+
+- name: Create systemd service for the Flask app
+  template:
+    src: flask_service.j2
+    dest: "/etc/systemd/system/{{ app.service_name }}.service"
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+    - Reload systemd
+    - Restart flask service
+
+- name: Ensure flask service is enabled and started
+  systemd:
+    name: "{{ app.service_name }}"
+    enabled: yes
+    state: restarted
+
+- name: Create nginx site for the flask app
+  template:
+    src: nginx_site.j2
+    dest: "/etc/nginx/sites-available/{{ app.service_name }}"
+    owner: root
+    group: root
+    mode: 0644
+  notify: Reload nginx
+
+- name: Enable nginx site
+  file:
+    src: "/etc/nginx/sites-available/{{ app.service_name }}"
+    dest: "/etc/nginx/sites-enabled/{{ app.service_name }}"
+    state: link
+    force: yes
+
+- name: Remove default nginx site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Reload nginx

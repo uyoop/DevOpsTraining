@@ -1,0 +1,2 @@
+*.retry   # Fichiers retry produits lors des execution en echec de ansible-playbook
+.vagrant

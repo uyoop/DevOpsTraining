@@ -1,0 +1,14 @@
+---
+# group_vars/appservers.yml - Variables pour le groupe appservers
+
+app:
+  name: covoiturage
+  user: webappuser
+  domain: covoiturage.test
+  install_path: /var/www/covoiturage
+
+db:
+  host: localhost
+  name: covoit
+  user: covoit_user
+  password: "{{ vault_db_password }}"

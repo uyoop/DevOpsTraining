@@ -1,0 +1,25 @@
+---
+# webserver/handlers/main.yml
+
+- name: Restart Apache
+  systemd:
+    name: apache2
+    state: restarted
+  tags:
+    - webserver
+    - service
+
+- name: Reload Apache
+  systemd:
+    name: apache2
+    state: reloaded
+  tags:
+    - webserver
+    - service
+
+- name: Reload systemd
+  command: systemctl daemon-reload
+  args:
+    warn: false
+  tags:
+    - system

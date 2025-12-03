@@ -1,0 +1,364 @@
+/* === Variables de couleurs inspirées BlaBlaCar === */
+:root {
+    --primary-green: #00AFF5;
+    --primary-green-dark: #00BF6F;
+    --secondary-green: #10CE88;
+    --light-green: #E8F8F5;
+    --dark-green: #008F5D;
+    --text-dark: #2D3E50;
+    --text-light: #6C757D;
+    --background: #F7FAFC;
+    --white: #FFFFFF;
+    --border-light: #E2E8F0;
+    --shadow: rgba(0, 0, 0, 0.08);
+    --error: #E53E3E;
+    --success: #38A169;
+}
+
+/* === Reset et Base === */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, var(--background) 0%, #E6F7F1 100%);
+    color: var(--text-dark);
+    line-height: 1.6;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+/* === Container Principal === */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* === Header === */
+h1 {
+    text-align: center;
+    color: var(--dark-green);
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 40px;
+    padding: 20px;
+    background: var(--white);
+    border-radius: 16px;
+    box-shadow: 0 4px 20px var(--shadow);
+    position: relative;
+}
+
+h1::before {
+    content: "🚗";
+    margin-right: 10px;
+}
+
+h2 {
+    color: var(--dark-green);
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    font-weight: 600;
+}
+
+/* === Cards === */
+.card {
+    background: var(--white);
+    padding: 30px;
+    margin-bottom: 30px;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px var(--shadow);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 30px rgba(0, 191, 111, 0.15);
+}
+
+/* === Messages === */
+.message {
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    background: linear-gradient(135deg, var(--light-green) 0%, #D4F4E8 100%);
+    border-left: 4px solid var(--secondary-green);
+    border-radius: 12px;
+    color: var(--dark-green);
+    font-weight: 500;
+    animation: slideIn 0.5s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* === Formulaires === */
+.form-group {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--text-dark);
+    font-size: 0.95rem;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="date"],
+input[type="time"],
+input[type="number"],
+select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid var(--border-light);
+    border-radius: 10px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    background: var(--white);
+    color: var(--text-dark);
+}
+
+input:focus,
+select:focus {
+    outline: none;
+    border-color: var(--secondary-green);
+    box-shadow: 0 0 0 3px rgba(16, 206, 136, 0.1);
+}
+
+input::placeholder {
+    color: var(--text-light);
+}
+
+/* === Boutons === */
+button {
+    padding: 14px 28px;
+    margin-top: 12px;
+    background: linear-gradient(135deg, var(--secondary-green) 0%, var(--primary-green-dark) 100%);
+    color: var(--white);
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(16, 206, 136, 0.3);
+    width: 100%;
+}
+
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(16, 206, 136, 0.4);
+    background: linear-gradient(135deg, var(--primary-green-dark) 0%, var(--dark-green) 100%);
+}
+
+button:active {
+    transform: translateY(0);
+}
+
+/* === Liste des trajets === */
+.trip {
+    border-top: 2px solid var(--border-light);
+    padding: 24px 0;
+    margin-top: 20px;
+    transition: all 0.3s ease;
+}
+
+.trip:first-child {
+    border-top: none;
+}
+
+.trip:hover {
+    background: var(--light-green);
+    padding: 24px 20px;
+    margin: 20px -20px 0 -20px;
+    border-radius: 12px;
+}
+
+.trip-info {
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.trip-info strong {
+    color: var(--dark-green);
+    min-width: 140px;
+    font-weight: 600;
+}
+
+.trip-route {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--dark-green);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.trip-route::before {
+    content: "📍";
+}
+
+.trip-route::after {
+    content: "→";
+    color: var(--secondary-green);
+    margin: 0 8px;
+}
+
+/* === Formulaire de réservation === */
+.reserve-form {
+    margin-top: 20px;
+    padding: 24px;
+    background: linear-gradient(135deg, var(--light-green) 0%, rgba(232, 248, 245, 0.5) 100%);
+    border-radius: 12px;
+    border: 2px dashed var(--secondary-green);
+}
+
+.reserve-form h3 {
+    color: var(--dark-green);
+    margin-bottom: 16px;
+    font-size: 1.1rem;
+}
+
+/* === États === */
+.full {
+    color: var(--error);
+    font-weight: 700;
+    padding: 8px 16px;
+    background: rgba(229, 62, 62, 0.1);
+    border-radius: 8px;
+    display: inline-block;
+}
+
+.available {
+    color: var(--success);
+    font-weight: 600;
+}
+
+/* === Badges === */
+.badge {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    background: var(--light-green);
+    color: var(--dark-green);
+}
+
+/* === Grid Layout pour formulaire === */
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+/* === Responsive Design === */
+@media (max-width: 768px) {
+    body {
+        padding: 12px;
+    }
+
+    h1 {
+        font-size: 1.8rem;
+        padding: 16px;
+        margin-bottom: 24px;
+    }
+
+    h2 {
+        font-size: 1.3rem;
+    }
+
+    .card {
+        padding: 20px;
+        margin-bottom: 20px;
+        border-radius: 12px;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    button {
+        padding: 12px 20px;
+        font-size: 0.95rem;
+    }
+
+    .trip-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .trip-info strong {
+        min-width: auto;
+    }
+
+    .trip:hover {
+        margin: 20px -12px 0 -12px;
+        padding: 20px 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    h1 {
+        font-size: 1.5rem;
+    }
+
+    .card {
+        padding: 16px;
+    }
+
+    input,
+    select,
+    button {
+        font-size: 0.9rem;
+    }
+}
+
+/* === Animations === */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.card {
+    animation: fadeIn 0.6s ease;
+}
+
+/* === Scrollbar personnalisée === */
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--secondary-green);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--dark-green);
+}

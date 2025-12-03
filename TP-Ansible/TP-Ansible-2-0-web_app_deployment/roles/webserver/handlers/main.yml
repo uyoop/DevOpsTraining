@@ -1,0 +1,17 @@
+---
+# webserver/handlers/main.yml
+
+- name: Restart flask service
+  systemd:
+    name: "{{ app.service_name }}"
+    state: restarted
+
+- name: Reload nginx
+  systemd:
+    name: nginx
+    state: reloaded
+
+- name: Reload systemd
+  command: systemctl daemon-reload
+  args:
+    warn: false

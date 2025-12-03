@@ -1,0 +1,30 @@
+---
+# webapp_deploy.yml - Deployment playbook for Covoiturage app
+- name: Deploy Covoiturage Flask application
+  hosts: appservers
+  become: true
+  
+  pre_tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+  
+  roles:
+    - common
+    - webserver
+  
+  post_tasks:
+    - name: Verify deployment - Check service status
+      systemd:
+        name: "{{ app.service_name }}"
+        state: started
+      register: service_status
+      failed_when: service_status.failed
+      
+    - name: Verify deployment - Check nginx status
+      systemd:
+        name: nginx
+        state: started
+      register: nginx_status
+      failed_when: nginx_status.failed

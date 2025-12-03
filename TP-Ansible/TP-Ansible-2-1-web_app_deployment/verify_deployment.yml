@@ -1,0 +1,114 @@
+---
+# verify_deployment.yml - Vérification complète du déploiement
+- name: Verify Covoiturage application deployment
+  hosts: appservers
+  become: true
+  gather_facts: yes
+  
+  tasks:
+    - name: Check Apache service status
+      systemd:
+        name: apache2
+      register: apache_service
+      tags:
+        - verify
+        - webserver
+    
+    - name: Display Apache status
+      debug:
+        msg: "Apache2 is {{ apache_service.status.ActiveState }}"
+      tags:
+        - verify
+        - webserver
+    
+    - name: Check MySQL service status
+      systemd:
+        name: mysql
+      register: mysql_service
+      tags:
+        - verify
+        - database
+    
+    - name: Display MySQL status
+      debug:
+        msg: "MySQL is {{ mysql_service.status.ActiveState }}"
+      tags:
+        - verify
+        - database
+    
+    - name: Check PHP-FPM service status
+      systemd:
+        name: php8.3-fpm
+      register: php_service
+      tags:
+        - verify
+        - appserver
+    
+    - name: Display PHP-FPM status
+      debug:
+        msg: "PHP-FPM is {{ php_service.status.ActiveState }}"
+      tags:
+        - verify
+        - appserver
+    
+    - name: Check application files exist
+      stat:
+        path: "{{ app.install_path }}/index.php"
+      register: app_files
+      tags:
+        - verify
+        - appserver
+    
+    - name: Display application files status
+      debug:
+        msg: "Application files are {{ 'present' if app_files.stat.exists else 'missing' }}"
+      tags:
+        - verify
+        - appserver
+    
+    - name: Check database exists
+      command: mysql -u {{ db.user }} -p{{ db.password }} -e "USE {{ db.name }}; SHOW TABLES;"
+      register: db_check
+      changed_when: false
+      no_log: true
+      tags:
+        - verify
+        - database
+    
+    - name: Display database status
+      debug:
+        msg: "Database tables: {{ db_check.stdout_lines | length }} found"
+      tags:
+        - verify
+        - database
+    
+    - name: Test HTTP response
+      uri:
+        url: "http://localhost"
+        status_code: 200
+      register: http_test
+      ignore_errors: yes
+      tags:
+        - verify
+        - webserver
+    
+    - name: Display HTTP test result
+      debug:
+        msg: "HTTP response: {{ 'OK' if http_test.status == 200 else 'FAILED' }}"
+      tags:
+        - verify
+        - webserver
+    
+    - name: Summary
+      debug:
+        msg: |
+          ===== DEPLOYMENT VERIFICATION =====
+          Apache2: {{ apache_service.status.ActiveState }}
+          MySQL: {{ mysql_service.status.ActiveState }}
+          PHP-FPM: {{ php_service.status.ActiveState }}
+          Application files: {{ 'present' if app_files.stat.exists else 'missing' }}
+          HTTP response: {{ 'OK' if http_test.status == 200 else 'FAILED' }}
+          ===================================
+      tags:
+        - verify
+        - summary

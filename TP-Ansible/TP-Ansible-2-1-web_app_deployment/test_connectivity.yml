@@ -1,0 +1,22 @@
+---
+# test_connectivity.yml - Test de connectivité Ansible
+- name: Test connectivity to application servers
+  hosts: appservers
+  gather_facts: yes
+  
+  tasks:
+    - name: Ping test
+      ping:
+      tags:
+        - test
+    
+    - name: Display server information
+      debug:
+        msg: |
+          Hostname: {{ ansible_hostname }}
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          IP: {{ ansible_default_ipv4.address }}
+          Python: {{ ansible_python_version }}
+      tags:
+        - test
+        - info

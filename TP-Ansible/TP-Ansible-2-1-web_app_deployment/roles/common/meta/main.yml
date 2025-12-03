@@ -1,0 +1,13 @@
+---
+# common/meta/main.yml
+
+galaxy_info:
+  author: Ansible Developer
+  namespace: custom
+  name: common
+  version: 1.0.0
+  description: Install common system dependencies
+  license:
+    - GPL-3.0-or-later
+
+dependencies: []

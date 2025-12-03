@@ -1,0 +1,15 @@
+[Unit]
+Description=Flask {{ app.name }} Gunicorn Service
+After=network.target
+
+[Service]
+User={{ app.user }}
+Group=www-data
+WorkingDirectory=/home/{{ app.user }}/{{ app.name }}
+Environment=PATH=/home/{{ app.user }}/{{ app.name }}/venv/bin
+ExecStart=/home/{{ app.user }}/{{ app.name }}/venv/bin/gunicorn -w 3 -b unix:/run/{{ app.service_name }}.sock wsgi:app
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
