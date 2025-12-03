@@ -1,7 +1,0 @@
----
-- name: Installer Docker sur la VM ubu1
-  hosts: ubudock1
-  become: true
-
-  roles:
-    - role: docker_install
