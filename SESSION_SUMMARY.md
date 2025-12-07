@@ -1,5 +1,22 @@
 # 🎉 TPs Docker - Résumé de Session
 
+## 🔍 Audit GitHub et Corrections - COMPLÉTÉ
+
+### ✅ Audit du Repository (7 décembre 2025)
+- **Résultat** : Standardisation et nettoyage complets des .gitignore
+- **Fichiers modifiés** : 12 fichiers .gitignore améliorés
+- **Commit** : `4f6d39a` - Audit GitHub: Standardiser et améliorer les .gitignore
+- **Détails** : Voir `AUDIT_LOG.md` pour rapport complet
+
+**Améliorations principales** :
+- ✅ Catégorisation uniforme (ENVIRONMENT, SECRETS, DATA, IDE, OS, LOGS, DOCKER)
+- ✅ Protection renforcée des secrets (.env, *.key, *.crt, *.pem, acme.json)
+- ✅ Cohérence accrue entre tous les TPs
+- ✅ .gitignore ajouté au dossier branches/ pour éviter le tracking
+- ✅ Patterns standards pour data, logs, IDE files, OS files
+
+---
+
 ## 🆕 Nouveaux TPs ajoutés (11 → 18)
 - TP11 NetBox Docker (basique) : déploiement rapide IPAM/DCIM (PostgreSQL + Redis + Worker).
 - TP12 NetBox Professionnel : Traefik TLS, monitoring Prometheus/Grafana, API GraphQL/REST sécurisée.
