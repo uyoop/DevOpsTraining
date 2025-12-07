@@ -1,0 +1,38 @@
+---
+# Playbook: Installation GitLab Complète
+# Description: Déployer GitLab server, PostgreSQL, Redis, runner CI/CD
+# Usage: ansible-playbook Playbooks/gitlab-install.yml -i inventory.ini -l gitlab_servers
+# Tags: git, ci-cd, gitlab
+
+- name: GitLab Complete Deployment
+  hosts: "{{ target_hosts | default('gitlab_servers') }}"
+  become: yes
+  gather_facts: yes
+  tags: [git, ci-cd, gitlab]
+
+  roles:
+    - role: postgresql
+      tags: [db]
+    - role: redis
+      tags: [cache]
+    - role: gitlab
+      tags: [gitlab-server]
+    - role: gitlab-runner
+      tags: [gitlab-runner]
+    - role: letsencrypt
+      tags: [ssl]
+
+  post_tasks:
+    - name: GitLab readiness check
+      uri:
+        url: "http://localhost/-/health"
+        method: GET
+        status_code: 200
+      retries: 3
+      delay: 10
+      register: gitlab_health
+      changed_when: false
+
+    - name: GitLab status
+      debug:
+        msg: "GitLab is ready: {{ gitlab_health.status == 200 }}"

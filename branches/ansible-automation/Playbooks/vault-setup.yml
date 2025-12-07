@@ -1,0 +1,27 @@
+---
+# Playbook: Setup Vault (Gestion des Secrets)
+# Description: Déployer HashiCorp Vault pour centralisé la gestion des secrets
+# Usage: ansible-playbook Playbooks/vault-setup.yml -i inventory.ini -l vault_servers
+# Tags: security, secrets, vault
+
+- name: Vault Secrets Management Setup
+  hosts: "{{ target_hosts | default('vault_servers') }}"
+  become: yes
+  gather_facts: yes
+  tags: [security, secrets, vault]
+
+  roles:
+    - role: vault
+      tags: [vault-install]
+    - role: vault-init
+      tags: [vault-init]
+
+  post_tasks:
+    - name: Vault status
+      shell: vault status
+      changed_when: false
+      register: vault_status
+
+    - name: Display Vault status
+      debug:
+        msg: "{{ vault_status.stdout_lines }}"

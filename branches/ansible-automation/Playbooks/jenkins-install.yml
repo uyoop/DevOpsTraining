@@ -1,0 +1,29 @@
+---
+# Playbook: Installation Jenkins
+# Description: Déployer Jenkins avec plugins essentiels pour CI/CD
+# Usage: ansible-playbook Playbooks/jenkins-install.yml -i inventory.ini
+# Tags: ci-cd, jenkins, automation
+
+- name: Jenkins CI/CD Server Installation
+  hosts: "{{ target_hosts | default('jenkins_servers') }}"
+  become: yes
+  gather_facts: yes
+  tags: [ci-cd, jenkins]
+
+  roles:
+    - role: jenkins
+      tags: [jenkins-install]
+    - role: jenkins-plugins
+      tags: [jenkins-plugins]
+
+  post_tasks:
+    - name: Jenkins service check
+      systemd:
+        name: jenkins
+        state: started
+      changed_when: false
+      register: jenkins_status
+
+    - name: Jenkins status
+      debug:
+        msg: "Jenkins service: {{ jenkins_status.status.ActiveState }}"

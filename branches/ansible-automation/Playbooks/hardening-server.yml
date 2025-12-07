@@ -1,0 +1,29 @@
+---
+# Playbook: Durcissement de Sécurité Serveur
+# Description: Appliquer les bonnes pratiques de sécurité (CIS Benchmarks)
+# Usage: ansible-playbook Playbooks/hardening-server.yml -i inventory.ini
+# Tags: security, hardening, compliance
+
+- name: Server Security Hardening
+  hosts: "{{ target_hosts | default('all') }}"
+  become: yes
+  gather_facts: yes
+  tags: [security, hardening]
+
+  roles:
+    - role: ssh-hardening
+      tags: [ssh]
+    - role: fail2ban
+      tags: [fail2ban]
+    - role: selinux
+      tags: [selinux]
+    - role: auditd
+      tags: [audit]
+
+  post_tasks:
+    - name: Security check summary
+      debug:
+        msg: |
+          SSH hardening: Applied
+          Fail2ban: Configured
+          Auditd: Enabled

@@ -1,0 +1,11 @@
+---
+# group_vars/appservers.yml - Variables pour le groupe appservers
+
+app:
+  name: covoiturage
+  user: flask
+  domain: covoiturage.test
+  repo_url: "https://github.com/CJenkins-AFPA/TP-Ansible.git"
+  repo_version: main
+  repo_path: "TP-Ansible-2-web_app_deployment/covoiturage_app"
+  service_name: "flask_covoiturage"

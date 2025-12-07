@@ -1,0 +1,11 @@
+---
+# Default variables for postgresql role
+
+pg_admin_user: postgres
+pg_admin_password: postgres
+pg_version: "14"
+pg_port: 5432
+pg_locale: en_US.UTF-8
+pg_encoding: UTF8
+pg_max_connections: 200
+pg_shared_buffers: "256MB"

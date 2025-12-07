@@ -1,0 +1,6 @@
+---
+# Default variables for system-update role
+
+system_update_auto_reboot: false
+system_update_reboot_delay: 300
+system_update_enabled: true

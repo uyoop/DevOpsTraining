@@ -1,0 +1,50 @@
+# Étape 2 – VM avec stack LAMP et dossier partagé
+# Cahier des charges
+# Créer un projet nommé tp-vagrant-lamp contenant :
+# http://10.200.99.142:80/link/24#bkmrk-une-vm-bas%C3%A9e-sur-%3A-b
+# Une VM basée sur :
+# bento/debian-13
+# Ajouter, dans le Vagrantfile :
+# Nom d’hôte : lamp-server
+# Port forwarding :
+# hôte → 7676
+# VM → 80
+# Dossier partagé :
+# ./shared → /var/www/html
+# avec :
+# owner: www-data, group: www-data, fmode=644, dmode=755
+# Provisionnement :
+# installer Apache2
+# installer PHP et extensions minimales (php, php-cli)
+# activer Apache au démarrage
+# nettoyer /var/www/html
+# copier une page index.html quelconque dans le dossier partagé
+# afficher un message dans /etc/motd
+# Le script doit être rejouable (vagrant provision sans erreurs).
+# Le site doit être accessible via :
+# http://ip:7676
+# Livrables
+# Dossier :
+# Vagrantfile sur github dans un répertoire tp-vagrant-lamp
+# script provisioning
+
+
+
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+
+# --- Configuration Vagrant pour stack LAMP ---
+Vagrant.configure("2") do |config|
+  config.vm.box = "bento/debian-13"
+  config.vm.hostname = "lamp-server"
+
+  # Port forwarding : hôte 7676 -> VM 80
+  config.vm.network "forwarded_port", guest: 80, host: 7676
+
+  # Dossier partagé ./shared -> /var/www/html
+  config.vm.synced_folder "./shared", "/var/www/html", owner: "www-data", group: "www-data", mount_options: ["dmode=755", "fmode=644"]
+
+  # Provisionnement via script externe
+  config.vm.provision "shell", path: "provision.sh"
+end

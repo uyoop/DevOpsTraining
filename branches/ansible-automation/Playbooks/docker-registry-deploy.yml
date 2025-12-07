@@ -1,0 +1,32 @@
+---
+# Playbook: Déploiement Docker Registry Privé
+# Description: Déployer un registry Docker sécurisé avec TLS et authentification
+# Usage: ansible-playbook Playbooks/docker-registry-deploy.yml -i inventory.ini
+# Tags: containers, registry, docker
+
+- name: Docker Registry Deployment
+  hosts: "{{ target_hosts | default('registry_servers') }}"
+  become: yes
+  gather_facts: yes
+  tags: [containers, registry]
+
+  roles:
+    - role: docker
+      when: "'docker' not in group_names"
+    - role: docker-registry
+      tags: [registry-deploy]
+
+  post_tasks:
+    - name: Test registry connectivity
+      uri:
+        url: "https://localhost:5000/v2/"
+        method: GET
+        user: "{{ registry_user | default('admin') }}"
+        password: "{{ registry_password | default('password') }}"
+        validate_certs: no
+      register: registry_health
+      changed_when: false
+
+    - name: Registry health
+      debug:
+        msg: "Registry health: {{ registry_health.status }}"

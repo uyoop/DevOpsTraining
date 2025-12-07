@@ -1,0 +1,22 @@
+# Portainer Docker Setup - Git Ignore
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Data
+data/
+volumes/
+
+# Temporary files
+*.log
+*.tmp
+*.swp
+*~
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project

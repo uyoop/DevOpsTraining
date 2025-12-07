@@ -1,0 +1,67 @@
+# AlertManager Configuration
+# ==============================================================================
+
+global:
+  resolve_timeout: 5m
+  slack_api_url: '${ALERTMANAGER_SLACK_WEBHOOK}'
+
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+route:
+  receiver: 'default-receiver'
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-receiver'
+      group_wait: 1s
+      group_interval: 5s
+      repeat_interval: 4h
+
+    # Warning alerts - hourly
+    - match:
+        severity: warning
+      receiver: 'warning-receiver'
+      group_wait: 30s
+      group_interval: 1h
+      repeat_interval: 24h
+
+inhibit_rules:
+  # Inhibit warning alerts if critical alert exists
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'dev', 'instance']
+
+receivers:
+  - name: 'default-receiver'
+    slack_configs:
+      - channel: '#monitoring'
+        title: 'Alert'
+        text: '{{ template "slack.default.text" . }}'
+
+  - name: 'critical-receiver'
+    slack_configs:
+      - channel: '#alerts-critical'
+        title: '🚨 CRITICAL'
+        text: '{{ template "slack.default.text" . }}'
+    email_configs:
+      - to: '${ALERTMANAGER_EMAIL_TO}'
+        from: '${ALERTMANAGER_EMAIL_FROM}'
+        smarthost: '${ALERTMANAGER_SMTP_HOST}:${ALERTMANAGER_SMTP_PORT}'
+        auth_username: '${ALERTMANAGER_SMTP_USER}'
+        auth_password: '${ALERTMANAGER_SMTP_PASSWORD}'
+        require_tls: true
+
+  - name: 'warning-receiver'
+    slack_configs:
+      - channel: '#alerts-warning'
+        title: '⚠️ WARNING'
+        text: '{{ template "slack.default.text" . }}'

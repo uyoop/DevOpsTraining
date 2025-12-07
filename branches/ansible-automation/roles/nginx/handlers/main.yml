@@ -1,0 +1,14 @@
+---
+# Handlers for nginx role
+
+- name: Restart Nginx
+  systemd:
+    name: nginx
+    state: restarted
+  listen: "restart_nginx"
+
+- name: Reload Nginx
+  systemd:
+    name: nginx
+    state: reloaded
+  listen: "reload_nginx"

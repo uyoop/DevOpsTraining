@@ -1,0 +1,28 @@
+---
+# Playbook: Installation Nginx
+# Description: Déployer Nginx en tant que reverse proxy / load balancer
+# Usage: ansible-playbook Playbooks/nginx-deploy.yml -i inventory.ini
+# Tags: web, reverse-proxy, load-balancer
+
+- name: Nginx Reverse Proxy Deployment
+  hosts: "{{ target_hosts | default('web_servers') }}"
+  become: yes
+  gather_facts: yes
+  tags: [web, reverse-proxy]
+
+  roles:
+    - role: nginx
+      tags: [nginx-install]
+    - role: letsencrypt
+      tags: [ssl]
+
+  post_tasks:
+    - name: Nginx health check
+      command: nginx -t
+      changed_when: false
+      register: nginx_test
+
+    - name: Nginx status
+      debug:
+        msg: "Nginx configuration OK"
+      when: nginx_test.rc == 0

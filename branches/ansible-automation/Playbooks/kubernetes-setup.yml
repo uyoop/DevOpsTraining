@@ -1,0 +1,34 @@
+---
+# Playbook: Installation Kubernetes
+# Description: Déployer un cluster Kubernetes avec kubeadm, CNI, RBAC
+# Usage: ansible-playbook Playbooks/kubernetes-setup.yml -i inventory.ini
+# Tags: kubernetes, orchestration, infrastructure
+
+- name: Kubernetes Cluster Setup
+  hosts: "{{ target_hosts | default('kubernetes_servers') }}"
+  become: yes
+  gather_facts: yes
+  tags: [kubernetes, orchestration]
+
+  roles:
+    - role: kubernetes-master
+      tags: [kubernetes-master]
+      when: inventory_hostname in groups.get('kubernetes_masters', [])
+    - role: kubernetes-worker
+      tags: [kubernetes-worker]
+      when: inventory_hostname in groups.get('kubernetes_workers', [])
+    - role: cni-plugin
+      tags: [cni-plugin]
+      when: inventory_hostname in groups.get('kubernetes_masters', [])[0:1]
+
+  post_tasks:
+    - name: Kubernetes cluster info
+      shell: kubectl cluster-info
+      changed_when: false
+      register: k8s_info
+      when: inventory_hostname in groups.get('kubernetes_masters', [])
+
+    - name: Cluster status
+      debug:
+        msg: "{{ k8s_info.stdout_lines | default(['K8s initializing...']) }}"
+      when: inventory_hostname in groups.get('kubernetes_masters', [])

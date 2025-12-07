@@ -1,0 +1,49 @@
+# Harbor Registry Configuration
+storage:
+  filesystem:
+    rootdirectory: /storage
+  delete:
+    enabled: true
+  cache:
+    layerinfo: inmemory
+  redirect:
+    disable: false
+
+auth:
+  htpasswd:
+    realm: Harbor Auth
+    path: /etc/registry/htpasswd
+
+middleware:
+  registry:
+    - name: registry
+  repository:
+    - name: repository
+  storage:
+    - name: storage
+
+http:
+  addr: :5000
+  debug:
+    addr: :5001
+    prometheus:
+      enabled: true
+      path: /metrics
+  headers:
+    X-Content-Type-Options:
+      - nosniff
+    X-Frame-Options:
+      - SAMEORIGIN
+
+validation:
+  manifests:
+    urls:
+      allow:
+        - ^https?://
+      deny: []
+
+log:
+  level: info
+  formatter: text
+  fields:
+    service: registry

@@ -1,0 +1,28 @@
+---
+# Playbook: Installation d'OPNsense
+# Description: Déployer et configurer OPNsense (alternative moderne à pfSense)
+# Usage: ansible-playbook Playbooks/opnsense-install.yml -i inventory.ini -l opnsense_servers
+# Tags: network, firewall, opnsense
+
+- name: OPNsense Installation & Configuration
+  hosts: "{{ target_hosts | default('opnsense_servers') }}"
+  become: yes
+  gather_facts: yes
+  tags: [network, opnsense]
+
+  roles:
+    - role: opnsense
+      tags: [opnsense-install]
+    - role: opnsense-rules
+      tags: [opnsense-rules]
+
+  post_tasks:
+    - name: Verify OPNsense installation
+      shell: which opnsense-revert
+      changed_when: false
+      failed_when: false
+      register: opnsense_check
+
+    - name: OPNsense installation status
+      debug:
+        msg: "OPNsense installed: {{ opnsense_check.rc == 0 }}"

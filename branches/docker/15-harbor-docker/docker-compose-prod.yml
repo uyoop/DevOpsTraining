@@ -1,0 +1,791 @@
+version: '3.9'
+
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: harbor-traefik
+    restart: always
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - public
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - TRAEFIK_API_INSECURE=false
+      - TRAEFIK_API_DASHBOARD=true
+      - TRAEFIK_ENTRYPOINTS_WEB_ADDRESS=:80
+      - TRAEFIK_ENTRYPOINTS_WEBSECURE_ADDRESS=:443
+      - TRAEFIK_PROVIDERS_DOCKER=true
+      - TRAEFIK_PROVIDERS_DOCKER_EXPOSEDBYDEFAULT=false
+      - TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_HTTPCHALLENGE=true
+      - TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_HTTPCHALLENGE_ENTRYPOINT=web
+      - TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL=${LETSENCRYPT_EMAIL:-admin@example.com}
+      - TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_STORAGE=/acme/acme.json
+      - TRAEFIK_ENTRYPOINTS_WEB_HTTP_REDIRECTIONS_ENTRYPOINT_WEB_SCHEME=https
+      - TRAEFIK_ENTRYPOINTS_WEB_HTTP_REDIRECTIONS_ENTRYPOINT_WEB_PERMANENT=true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/acme.json:/acme/acme.json
+      - ./traefik/config.yml:/traefik/config.yml:ro
+      - ./traefik/dynamic:/traefik/dynamic:ro
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  postgresql:
+    image: postgres:15-alpine
+    container_name: harbor-postgresql
+    restart: always
+    networks:
+      - database
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-PostgresHarborSecret123}
+      POSTGRES_USER: ${DB_USER:-harbor}
+      POSTGRES_INITDB_ARGS: "-c shared_preload_libraries=pg_stat_statements"
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data
+      - ./config/postgresql/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./config/postgresql/pg_hba.conf:/var/lib/postgresql/pg_hba.conf:ro
+      - ./config/postgresql/init-replication.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports:
+      - "5432:5432"
+    command:
+      - "postgres"
+      - "-c"
+      - "config_file=/etc/postgresql/postgresql.conf"
+      - "-c"
+      - "hba_file=/var/lib/postgresql/pg_hba.conf"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-harbor} -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  postgresql-replica:
+    image: postgres:15-alpine
+    container_name: harbor-postgresql-replica
+    restart: always
+    networks:
+      - database
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-PostgresHarborSecret123}
+      POSTGRES_USER: ${DB_USER:-harbor}
+      PGUSER: ${DB_USER:-harbor}
+    volumes:
+      - postgresql_replica_data:/var/lib/postgresql/data
+      - ./config/postgresql/postgresql-replica.conf:/etc/postgresql/postgresql.conf:ro
+    ports:
+      - "5433:5432"
+    command:
+      - "bash"
+      - "-c"
+      - |
+        until pg_basebackup -h postgresql -D /var/lib/postgresql/data -U ${DB_USER:-harbor} -v -P; do
+          echo "Waiting for primary to be available..."
+          sleep 1
+        done
+        postgres -c config_file=/etc/postgresql/postgresql.conf
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-harbor} -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: harbor-redis
+    restart: always
+    networks:
+      - backend
+    command:
+      - redis-server
+      - "--requirepass"
+      - "${REDIS_PASSWORD:-RedisHarborSecret123}"
+      - "--appendonly"
+      - "yes"
+      - "--maxmemory"
+      - "2gb"
+      - "--maxmemory-policy"
+      - "allkeys-lru"
+      - "--save"
+      - "900 1"
+      - "--save"
+      - "300 10"
+      - "--save"
+      - "60 10000"
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-RedisHarborSecret123}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis-sentinel-1:
+    image: redis:7-alpine
+    container_name: harbor-redis-sentinel-1
+    restart: always
+    networks:
+      - backend
+    command:
+      - redis-sentinel
+      - /etc/redis-sentinel/sentinel.conf
+    volumes:
+      - ./config/redis/sentinel-1.conf:/etc/redis-sentinel/sentinel.conf:ro
+      - redis_sentinel_1_data:/data
+    ports:
+      - "26379:26379"
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-sentinel-2:
+    image: redis:7-alpine
+    container_name: harbor-redis-sentinel-2
+    restart: always
+    networks:
+      - backend
+    command:
+      - redis-sentinel
+      - /etc/redis-sentinel/sentinel.conf
+    volumes:
+      - ./config/redis/sentinel-2.conf:/etc/redis-sentinel/sentinel.conf:ro
+      - redis_sentinel_2_data:/data
+    ports:
+      - "26380:26379"
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-sentinel-3:
+    image: redis:7-alpine
+    container_name: harbor-redis-sentinel-3
+    restart: always
+    networks:
+      - backend
+    command:
+      - redis-sentinel
+      - /etc/redis-sentinel/sentinel.conf
+    volumes:
+      - ./config/redis/sentinel-3.conf:/etc/redis-sentinel/sentinel.conf:ro
+      - redis_sentinel_3_data:/data
+    ports:
+      - "26381:26379"
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  harbor-log:
+    image: goharbor/harbor-log:v2.9.1
+    container_name: harbor-log
+    restart: always
+    networks:
+      - backend
+    environment:
+      - BITNAMI_DEBUG=false
+    volumes:
+      - ./config/harbor/log/logrotate.conf:/etc/logrotate.d/logrotate.conf:ro
+      - ./config/harbor/log/rsyslog.conf:/etc/rsyslog.conf:ro
+      - harbor_log_data:/var/log/docker
+    healthcheck:
+      test: ["CMD", "/bin/sh", "-c", "netstat -an | grep 10514"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  harbor-registry:
+    image: goharbor/registry-photon:v2.9.1
+    container_name: harbor-registry
+    restart: always
+    networks:
+      - backend
+    environment:
+      - REGISTRY_STORAGE=s3
+      - REGISTRY_STORAGE_S3_REGION=${STORAGE_REGION:-us-east-1}
+      - REGISTRY_STORAGE_S3_BUCKET=${STORAGE_BUCKET:-harbor-registry}
+      - REGISTRY_STORAGE_S3_ROOTDIRECTORY=${STORAGE_ROOT_DIR:-/registry}
+      - REGISTRY_STORAGE_S3_ACCESSKEY=${S3_ACCESSKEY:-minio}
+      - REGISTRY_STORAGE_S3_SECRETKEY=${S3_SECRETKEY:-miniominio}
+      - REGISTRY_STORAGE_S3_SECURE=true
+      - REGISTRY_STORAGE_S3_SKIPVERIFY=false
+      - REGISTRY_STORAGE_S3_V4AUTH=true
+      - REGISTRY_STORAGE_S3_ENDPOINT=${S3_ENDPOINT:-https://minio:9000}
+      - REGISTRY_STORAGE_S3_STORAGECLASS=STANDARD
+      - REGISTRY_HTTP_TLS_CERTIFICATE=/etc/registry/cert/tls.crt
+      - REGISTRY_HTTP_TLS_KEY=/etc/registry/cert/tls.key
+      - REGISTRY_HTTP_ADDR=:5000
+      - REGISTRY_HTTP_SECRET=${REGISTRY_HTTP_SECRET:-GenerateRandomSecret32Chars}
+      - REGISTRY_VALIDATION_ENABLED=true
+      - REGISTRY_VALIDATION_MANIFESTS_URLS_ALLOW=["."]
+      - REGISTRY_HEALTH_STORAGEDRIVER_ENABLED=true
+      - REGISTRY_HEALTH_STORAGEDRIVER_INTERVAL=10s
+      - REGISTRY_HEALTH_STORAGEDRIVER_THRESHOLD=3
+      - REGISTRY_LOG_LEVEL=info
+      - REGISTRY_LOG_FORMAT=json
+    volumes:
+      - ./config/registry/config.yml:/etc/docker/registry/config.yml:ro
+      - ./config/registry/cert:/etc/registry/cert:ro
+      - registry_data:/storage
+    ports:
+      - "5000:5000"
+    depends_on:
+      - harbor-log
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "https://localhost:5000/v2/", "--cacert", "/etc/registry/cert/tls.crt"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  harbor-core:
+    image: goharbor/harbor-core:v2.9.1
+    container_name: harbor-core
+    restart: always
+    networks:
+      - public
+      - backend
+      - database
+    environment:
+      - LOG_LEVEL=info
+      - CONFIG_PATH=/etc/harbor
+      - CHART_CACHE_DRIVER=redis
+      - _REDIS_URL_CORE=redis://${REDIS_PASSWORD:-RedisHarborSecret123}@redis:6379/0?idle_timeout_seconds=30
+      - CORE_SECRET=${CORE_SECRET:-CoreSecretGeneratedValue}
+      - JOBSERVICE_SECRET=${JOBSERVICE_SECRET:-JobserviceSecretGeneratedValue}
+      - REGISTRY_STORAGE_PROVIDER_NAME=${STORAGE_PROVIDER:-s3}
+      - REGISTRY_CREDENTIAL_USERNAME=${REGISTRY_USERNAME:-admin}
+      - REGISTRY_CREDENTIAL_PASSWORD=${REGISTRY_PASSWORD:-RegistryPassword123}
+      - DATABASE_TYPE=postgresql
+      - DATABASE_SERVER=postgresql
+      - DATABASE_PORT=5432
+      - DATABASE_DB=harbor
+      - DATABASE_USERNAME=${DB_USER:-harbor}
+      - DATABASE_PASSWORD=${DB_PASSWORD:-PostgresHarborSecret123}
+      - DATABASE_SSL_MODE=require
+      - DATABASE_MAX_IDLE_CONNS=50
+      - DATABASE_MAX_OPEN_CONNS=100
+      - DATABASE_CONN_MAX_LIFETIME=5m
+      - HARBOR_ADMIN_PASSWORD=${HARBOR_ADMIN_PASSWORD:-HarborAdmin123}
+      - LDAP_URL=${LDAP_URL:-ldap://ldap:389}
+      - LDAP_SEARCH_DN=${LDAP_SEARCH_DN:-cn=admin,dc=example,dc=com}
+      - LDAP_SEARCH_PASSWORD=${LDAP_SEARCH_PASSWORD:-admin}
+      - LDAP_BASE_DN=${LDAP_BASE_DN:-dc=example,dc=com}
+      - LDAP_UID=uid
+      - LDAP_SCOPE=2
+      - LDAP_CONNECTION_TIMEOUT=5
+      - LDAP_TIMEOUT=30
+      - OIDC_NAME=${OIDC_NAME:-OIDC}
+      - OIDC_ENDPOINT=${OIDC_ENDPOINT:-https://oidc.example.com}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
+      - OIDC_SCOPE=${OIDC_SCOPE:-openid,profile,email}
+      - OIDC_VERIFY_CERT=true
+      - OIDC_AUTO_ONBOARD=false
+      - OIDC_USER_CLAIM=preferred_username
+      - OIDC_GROUPS_CLAIM=groups
+      - OIDC_ADMIN_GROUP=${OIDC_ADMIN_GROUP:-}
+      - WEBHOOK_JOB_MAX_RETRY=3
+      - WEBHOOK_NOTIFICATION_SKIP_CERT_VERIFY=false
+      - WEBHOOK_NOTIFICATION_TIMEOUT=10
+      - NOTIFICATION_WEBHOOK_HEADER_TIMEOUT=30
+      - REGISTRY_NOTIFICATION_ENDPOINT=http://harbor-core:8080/service/notifications
+      - TOKEN_EXPIRATION=30
+      - REGISTRY_TOKEN_ENDPOINT=https://${HARBOR_DOMAIN:-registry.example.com}/service/token
+      - REGISTRY_URL=https://registry:5000
+      - METRIC_ENABLE=true
+      - METRIC_PORT=8001
+      - METRIC_PATH=/metrics
+      - HARBOR_LABEL_MIRROR=true
+      - NOTIFICATION_WEBHOOK_ENDPOINT=${WEBHOOK_ENDPOINT:-}
+    volumes:
+      - ./config/harbor/core:/etc/harbor:ro
+      - ./config/harbor/psc/private_key.pem:/etc/harbor/private_key.pem:ro
+      - ./config/harbor/psc/root_cert.crt:/etc/harbor/root_cert.crt:ro
+      - harbor_core_data:/data
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+      - "8001:8001"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      harbor-registry:
+        condition: service_healthy
+      harbor-log:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v2.0/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.harbor-core.rule=Host(`${HARBOR_DOMAIN:-registry.example.com}`)
+      - traefik.http.routers.harbor-core.entrypoints=websecure
+      - traefik.http.routers.harbor-core.tls=true
+      - traefik.http.routers.harbor-core.tls.certresolver=letsencrypt
+      - traefik.http.routers.harbor-core.middlewares=harbor-cors,harbor-headers
+      - traefik.http.services.harbor-core.loadbalancer.server.port=8080
+      - traefik.http.middlewares.harbor-cors.headers.accesscontrolalloworiginlist=${CORS_ALLOWED_ORIGINS:-*}
+      - traefik.http.middlewares.harbor-cors.headers.accesscontrolallowmethods=GET,PUT,POST,DELETE,OPTIONS,PATCH
+      - traefik.http.middlewares.harbor-headers.headers.customresponseheaders.X-Content-Type-Options=nosniff
+      - traefik.http.middlewares.harbor-headers.headers.customresponseheaders.X-Frame-Options=SAMEORIGIN
+      - traefik.http.middlewares.harbor-headers.headers.sslproxyheaders.X-Forwarded-Proto=https
+      - traefik.http.middlewares.harbor-headers.headers.forcesslredirect=true
+      - traefik.http.middlewares.harbor-headers.headers.sslhost=${HARBOR_DOMAIN:-registry.example.com}
+
+  harbor-registry-controller:
+    image: goharbor/harbor-registryctl:v2.9.1
+    container_name: harbor-registry-controller
+    restart: always
+    networks:
+      - backend
+    environment:
+      - CORE_SECRET=${CORE_SECRET:-CoreSecretGeneratedValue}
+      - JOBSERVICE_SECRET=${JOBSERVICE_SECRET:-JobserviceSecretGeneratedValue}
+      - REGISTRY_STORAGE_PROVIDER_NAME=${STORAGE_PROVIDER:-s3}
+      - REGISTRY_CREDENTIAL_USERNAME=${REGISTRY_USERNAME:-admin}
+      - REGISTRY_CREDENTIAL_PASSWORD=${REGISTRY_PASSWORD:-RegistryPassword123}
+      - REGISTRY_HTTP_HOST=harbor-registry
+      - REGISTRY_HTTP_PORT=5000
+      - REGISTRY_HTTP_RELATIVE_URLS=false
+      - LOG_LEVEL=info
+    volumes:
+      - ./config/harbor/registryctl/config.yml:/etc/registryctl/config.yml:ro
+    ports:
+      - "8888:8080"
+    depends_on:
+      - harbor-registry
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  harbor-jobservice:
+    image: goharbor/harbor-jobservice:v2.9.1
+    container_name: harbor-jobservice
+    restart: always
+    networks:
+      - backend
+      - database
+    environment:
+      - CORE_SECRET=${CORE_SECRET:-CoreSecretGeneratedValue}
+      - JOBSERVICE_SECRET=${JOBSERVICE_SECRET:-JobserviceSecretGeneratedValue}
+      - LOG_LEVEL=info
+      - JOB_SERVICE_POOL_BACKEND=redis
+      - JOB_REDIS_URL=redis://${REDIS_PASSWORD:-RedisHarborSecret123}@redis:6379/1?idle_timeout_seconds=30
+      - JOB_REGISTRY_CLIENT_URL=http://harbor-registry-controller:8080
+      - JOB_LOGGERS_STDOUT_LEVEL=info
+      - DATABASE_TYPE=postgresql
+      - DATABASE_SERVER=postgresql
+      - DATABASE_PORT=5432
+      - DATABASE_DB=harbor
+      - DATABASE_USERNAME=${DB_USER:-harbor}
+      - DATABASE_PASSWORD=${DB_PASSWORD:-PostgresHarborSecret123}
+      - DATABASE_SSL_MODE=require
+    volumes:
+      - ./config/harbor/jobservice/config.yml:/etc/jobservice/config.yml:ro
+      - harbor_jobservice_data:/var/log/jobs
+    ports:
+      - "8888"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      harbor-core:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/stats"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  harbor-trivy:
+    image: goharbor/trivy-adapter-photon:v2.9.1
+    container_name: harbor-trivy
+    restart: always
+    networks:
+      - backend
+    environment:
+      - SCANNER_LOG_LEVEL=info
+      - SCANNER_SCAN_REQUEST_TIMEOUT=30m
+      - SCANNER_CACHE_ENABLED=true
+      - SCANNER_CACHE_DIR=/home/scanner/.cache
+      - SCANNER_TRIVY_CACHE_DIR=/home/scanner/.cache/trivy
+      - SCANNER_TRIVY_OFFLINE_SCAN=false
+      - SCANNER_TRIVY_SEVERITY=UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+      - SCANNER_TRIVY_INSECURE=false
+      - SCANNER_TRIVY_GITHUB_TOKEN=${TRIVY_GITHUB_TOKEN:-}
+      - SCANNER_TRIVY_SKIP_UPDATE=false
+      - SCANNER_TRIVY_TIMEOUT=5m
+      - SCANNER_API_SERVER_ADDR=:8080
+      - SCANNER_METRICS_ENABLED=true
+      - SCANNER_METRICS_ADDR=:8081
+    volumes:
+      - trivy_cache:/home/scanner/.cache
+      - ./config/trivy/trivy.yaml:/etc/trivy/trivy.yaml:ro
+    ports:
+      - "8080"
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/metadata"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  harbor-notary-server:
+    image: goharbor/notary-server-photon:v2.9.1
+    container_name: harbor-notary-server
+    restart: always
+    networks:
+      - backend
+      - database
+    environment:
+      - LOG_LEVEL=info
+      - MIGRATIONS_PATH=/migrations/server/postgresql
+      - DB_BACKEND=postgres
+      - DB_HOST=postgresql
+      - DB_PORT=5432
+      - DB_NAME=notaryserver
+      - DB_USER=${DB_USER:-harbor}
+      - DB_PASSWORD=${DB_PASSWORD:-PostgresHarborSecret123}
+      - DB_SSL_MODE=require
+      - DEFAULT_ALIAS=default
+      - NOTARY_SERVER_DB_URL=postgres://${DB_USER:-harbor}:${DB_PASSWORD:-PostgresHarborSecret123}@postgresql:5432/notaryserver?sslmode=require
+      - TIMESTAMP_SERVER_URL=${TIMESTAMP_SERVER_URL:-http://timestamp.docker.io:80}
+    volumes:
+      - ./config/notary/server-config.json:/etc/notary/server-config.json:ro
+      - ./config/notary/signer-cert.crt:/certs/signer-cert.crt:ro
+      - notary_server_data:/var/lib/notary
+    ports:
+      - "4443:4443"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "--cacert", "/certs/signer-cert.crt", "https://localhost:4443/_notary_server/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  harbor-notary-signer:
+    image: goharbor/notary-signer-photon:v2.9.1
+    container_name: harbor-notary-signer
+    restart: always
+    networks:
+      - backend
+      - database
+    environment:
+      - LOG_LEVEL=info
+      - MIGRATIONS_PATH=/migrations/signer/postgresql
+      - DB_BACKEND=postgres
+      - DB_HOST=postgresql
+      - DB_PORT=5432
+      - DB_NAME=notarysigner
+      - DB_USER=${DB_USER:-harbor}
+      - DB_PASSWORD=${DB_PASSWORD:-PostgresHarborSecret123}
+      - DB_SSL_MODE=require
+      - NOTARY_SIGNER_DB_URL=postgres://${DB_USER:-harbor}:${DB_PASSWORD:-PostgresHarborSecret123}@postgresql:5432/notarysigner?sslmode=require
+      - NOTARY_SIGNER_DEFAULT_ALIAS=default
+      - NOTARY_SIGNER_TIMESTAMP_SERVER_URL=${TIMESTAMP_SERVER_URL:-http://timestamp.docker.io:80}
+    volumes:
+      - ./config/notary/signer-config.json:/etc/notary/signer-config.json:ro
+      - notary_signer_data:/var/lib/notary
+    ports:
+      - "7899:7899"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7899/_notary_signer/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: harbor-prometheus
+    restart: always
+    networks:
+      - backend
+    environment:
+      - TZ=UTC
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./config/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--storage.tsdb.retention.size=50GB"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.enable-lifecycle"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: harbor-grafana
+    restart: always
+    networks:
+      - public
+      - backend
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-GrafanaAdmin123}
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-worldmap-panel
+      - GF_SMTP_ENABLED=true
+      - GF_SMTP_HOST=${SMTP_HOST:-localhost}
+      - GF_SMTP_PORT=${SMTP_PORT:-587}
+      - GF_SMTP_USER=${SMTP_USER:-}
+      - GF_SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - GF_SMTP_FROM_ADDRESS=${SMTP_FROM:-noreply@example.com}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_LDAP_ENABLED=${LDAP_ENABLED:-false}
+      - GF_AUTH_LDAP_CONFIG_PATH=/etc/grafana/ldap.toml
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/ldap.toml:/etc/grafana/ldap.toml:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.harbor-grafana.rule=Host(`grafana.${HARBOR_DOMAIN:-example.com}`)
+      - traefik.http.routers.harbor-grafana.entrypoints=websecure
+      - traefik.http.routers.harbor-grafana.tls=true
+      - traefik.http.routers.harbor-grafana.tls.certresolver=letsencrypt
+      - traefik.http.services.harbor-grafana.loadbalancer.server.port=3000
+
+  loki:
+    image: grafana/loki:latest
+    container_name: harbor-loki
+    restart: always
+    networks:
+      - backend
+    volumes:
+      - ./config/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+    command:
+      - "-config.file=/etc/loki/loki-config.yml"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3100/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: harbor-promtail
+    restart: always
+    networks:
+      - backend
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./config/loki/promtail-config.yml:/etc/promtail/config.yml:ro
+    command:
+      - "-config.file=/etc/promtail/config.yml"
+    depends_on:
+      - loki
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9080/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: harbor-alertmanager
+    restart: always
+    networks:
+      - backend
+    environment:
+      - TZ=UTC
+    volumes:
+      - ./config/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./config/alertmanager/notification-templates:/etc/alertmanager/notification-templates:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "9093:9093"
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+      - "--web.external-url=http://alertmanager:9093"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9093/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgresql_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${VOLUMES_PATH:-./volumes}/postgresql
+  postgresql_replica_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${VOLUMES_PATH:-./volumes}/postgresql-replica
+  redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${VOLUMES_PATH:-./volumes}/redis
+  redis_sentinel_1_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${VOLUMES_PATH:-./volumes}/redis-sentinel-1
+  redis_sentinel_2_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${VOLUMES_PATH:-./volumes}/redis-sentinel-2
+  redis_sentinel_3_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${VOLUMES_PATH:-./volumes}/redis-sentinel-3
+  harbor_log_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${VOLUMES_PATH:-./volumes}/harbor-log
+  registry_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${VOLUMES_PATH:-./volumes}/registry
+  harbor_core_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${VOLUMES_PATH:-./volumes}/harbor-core
+  harbor_jobservice_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${VOLUMES_PATH:-./volumes}/harbor-jobservice
+  trivy_cache:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${VOLUMES_PATH:-./volumes}/trivy-cache
+  notary_server_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${VOLUMES_PATH:-./volumes}/notary-server
+  notary_signer_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${VOLUMES_PATH:-./volumes}/notary-signer
+  prometheus_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${VOLUMES_PATH:-./volumes}/prometheus
+  grafana_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${VOLUMES_PATH:-./volumes}/grafana
+  loki_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${VOLUMES_PATH:-./volumes}/loki
+  alertmanager_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${VOLUMES_PATH:-./volumes}/alertmanager
+
+networks:
+  public:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+  backend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+  database:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16

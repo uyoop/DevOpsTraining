@@ -1,0 +1,23 @@
+# Trivy Configuration
+# ==============================================================================
+
+listen: 0.0.0.0:8080
+
+cache:
+  dir: /root/.cache/trivy
+
+severity: ${TRIVY_SEVERITY:-HIGH,CRITICAL}
+skip-update: ${TRIVY_SKIP_UPDATE:-false}
+offline-mode: ${TRIVY_OFFLINE_MODE:-false}
+
+timeout: 5m0s
+timeout-scan: 5m0s
+
+reports:
+  format: json
+  cyclone-dx: false
+  sarif: false
+
+log:
+  level: info
+  format: json

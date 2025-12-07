@@ -1,0 +1,42 @@
+---
+# Role: nginx
+# Description: Install and configure Nginx web server/reverse proxy
+
+- name: Install Nginx
+  apt:
+    name: nginx
+    state: present
+  tags: [nginx, install]
+
+- name: Create Nginx configuration directory
+  file:
+    path: /etc/nginx/conf.d
+    state: directory
+    mode: '0755'
+  tags: [nginx, config]
+
+- name: Create Nginx sites directory
+  file:
+    path: /etc/nginx/sites-available
+    state: directory
+    mode: '0755'
+  tags: [nginx, config]
+
+- name: Start Nginx service
+  systemd:
+    name: nginx
+    state: started
+    enabled: yes
+  tags: [nginx, service]
+
+- name: Test Nginx configuration
+  command: nginx -t
+  changed_when: false
+  register: nginx_test
+  tags: [nginx, verify]
+
+- name: Display Nginx test result
+  debug:
+    msg: "Nginx configuration OK"
+  when: nginx_test.rc == 0
+  tags: [nginx, verify]

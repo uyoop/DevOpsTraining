@@ -1,0 +1,210 @@
+version: '3.9'
+
+services:
+  # ============================================================================
+  # Traefik v3 - Reverse Proxy with SSL/TLS
+  # ============================================================================
+  traefik:
+    image: traefik:v3.1
+    container_name: traefik
+    restart: always
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - portainer-network
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    environment:
+      - TRAEFIK_ENTRYPOINTS_WEB_ADDRESS=:80
+      - TRAEFIK_ENTRYPOINTS_WEBSECURE_ADDRESS=:443
+      - TRAEFIK_ENTRYPOINTS_WEB_HTTP_REDIRECTIONS_ENTRYPOINT_MAIN=websecure
+      - TRAEFIK_API_DASHBOARD=true
+      - TRAEFIK_LOG_LEVEL=${TRAEFIK_LOG_LEVEL:-INFO}
+      - TRAEFIK_PROVIDERS_DOCKER=true
+      - TRAEFIK_PROVIDERS_DOCKER_EXPOSEDBYDEFAULT=false
+      - TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_TLSCHALLENGE=true
+      - TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL=${CERT_EMAIL}
+      - TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_STORAGE=/traefik/acme.json
+      - TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_CASERVER=${ACME_SERVER:-https://acme-v02.api.letsencrypt.org/directory}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/acme.json:/traefik/acme.json
+      - ./traefik/config.yml:/etc/traefik/dynamic/config.yml:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-dashboard.rule=Host(\`${TRAEFIK_DASHBOARD_HOST}\`)"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ============================================================================
+  # PostgreSQL - Database for Portainer Business Edition
+  # ============================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: portainer-postgres
+    restart: always
+    networks:
+      - portainer-internal
+    environment:
+      POSTGRES_DB: ${POSTGRES_DATABASE:-portainer}
+      POSTGRES_USER: ${POSTGRES_USER:-portainer}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
+  # Portainer Business Edition (or CE with PostgreSQL)
+  # ============================================================================
+  portainer:
+    image: portainer/portainer-ee:latest
+    container_name: portainer
+    restart: always
+    networks:
+      - portainer-network
+      - portainer-internal
+    ports:
+      - "8000:8000"
+      - "9000:9000"
+      - "9443:9443"
+    environment:
+      PORTAINER_ADMIN_PASSWORD: ${PORTAINER_ADMIN_PASSWORD}
+      PORTAINER_VERSION: ${PORTAINER_VERSION:-latest}
+      PORTAINER_LOG_LEVEL: ${PORTAINER_LOG_LEVEL:-info}
+      DATABASE_TYPE: postgresql
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USERNAME: ${POSTGRES_USER:-portainer}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      DATABASE_NAME: ${POSTGRES_DATABASE:-portainer}
+      ADMIN_PASSWORD: ${PORTAINER_ADMIN_PASSWORD}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer-data:/data
+      - ./config/portainer:/etc/portainer:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portainer.rule=Host(\`${PORTAINER_HOSTNAME}\`)"
+      - "traefik.http.routers.portainer.entrypoints=websecure"
+      - "traefik.http.routers.portainer.tls.certresolver=letsencrypt"
+      - "traefik.http.services.portainer.loadbalancer.server.port=9000"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================================================
+  # Prometheus - Metrics Collection
+  # ============================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: always
+    networks:
+      - portainer-network
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-30d}'
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.rule=Host(\`prometheus.${PORTAINER_HOSTNAME}\`)"
+      - "traefik.http.routers.prometheus.entrypoints=websecure"
+      - "traefik.http.routers.prometheus.tls.certresolver=letsencrypt"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================================================
+  # Grafana - Visualization
+  # ============================================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: always
+    networks:
+      - portainer-network
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_INSTALL_PLUGINS: grafana-piechart-panel,grafana-worldmap-panel,grafana-clock-panel
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(\`grafana.${PORTAINER_HOSTNAME}\`)"
+      - "traefik.http.routers.grafana.entrypoints=websecure"
+      - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================================================
+  # Portainer Agent (for remote host management)
+  # ============================================================================
+  portainer-agent:
+    image: portainer/agent:latest
+    container_name: portainer-agent
+    restart: always
+    networks:
+      - portainer-network
+    ports:
+      - "9001:9001"
+    environment:
+      AGENT_PORT: 9001
+      AGENT_DATA_PATH: /var/lib/portainer
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/volumes:/var/lib/docker/volumes
+      - /var/log:/host/var/log:ro
+      - /:/host:ro
+      - portainer-agent-data:/var/lib/portainer
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.portainer-agent.rule=HostSNI(\`*\`)"
+      - "traefik.tcp.routers.portainer-agent.entrypoints=websecure"
+      - "traefik.tcp.services.portainer-agent.loadbalancer.server.port=9001"
+
+networks:
+  portainer-network:
+    driver: bridge
+  portainer-internal:
+    driver: bridge
+    internal: true
+
+volumes:
+  portainer-data:
+  portainer-agent-data:
+  postgres-data:
+  prometheus-data:
+  grafana-data:

@@ -1,0 +1,9 @@
+---
+# appserver/meta/main.yml
+
+dependencies: []
+
+galaxy_info:
+  author: AFPA DevOps
+  description: PHP application server setup for Covoiturage application
+  min_ansible_version: 2.9

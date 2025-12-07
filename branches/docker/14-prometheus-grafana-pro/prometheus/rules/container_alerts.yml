@@ -1,0 +1,100 @@
+groups:
+- name: production_container_alerts
+  interval: 1m
+  rules:
+  # Container Down
+  - alert: ProductionContainerDown
+    expr: absent(container_last_seen{name=~"prometheus|grafana|loki|alertmanager|traefik"})
+    for: 1m
+    labels:
+      severity: critical
+      component: docker
+      environment: production
+    annotations:
+      summary: "🚨 CRITICAL: Production container {{ $labels.name }} is down"
+      description: "Critical production container is not running"
+      runbook_url: "https://runbook.example.com/container-down"
+
+  # Container Restarting Frequently
+  - alert: ContainerRestartingFrequently
+    expr: rate(container_last_seen{name!=""}[5m]) > 0 and changes(container_last_seen{name!=""}[15m]) > 3
+    for: 5m
+    labels:
+      severity: warning
+      component: docker
+      environment: production
+    annotations:
+      summary: "Container {{ $labels.name }} restarting frequently"
+      description: "Container has restarted {{ $value }} times in the last 15 minutes"
+
+  # Container Memory OOM Risk
+  - alert: ContainerMemoryOOMRisk
+    expr: (container_memory_usage_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""} * 100) > 95
+    for: 2m
+    labels:
+      severity: critical
+      component: docker
+      environment: production
+    annotations:
+      summary: "🚨 Container {{ $labels.name }} at risk of OOM"
+      description: "Container memory usage is {{ $value | humanizePercentage }}"
+
+  # Container High Memory Usage
+  - alert: ContainerHighMemoryUsage
+    expr: (container_memory_usage_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""} * 100) > 80
+    for: 5m
+    labels:
+      severity: warning
+      component: docker
+      environment: production
+    annotations:
+      summary: "Container {{ $labels.name }} high memory usage"
+      description: "Container memory usage is {{ $value | humanizePercentage }}"
+
+  # Container CPU Throttling
+  - alert: ContainerCPUThrottling
+    expr: rate(container_cpu_cfs_throttled_periods_total{name!=""}[5m]) / rate(container_cpu_cfs_periods_total{name!=""}[5m]) > 0.30
+    for: 5m
+    labels:
+      severity: warning
+      component: docker
+      environment: production
+    annotations:
+      summary: "Container {{ $labels.name }} experiencing CPU throttling"
+      description: "Container is being throttled {{ $value | humanizePercentage }} of the time"
+
+  # Container High CPU Usage
+  - alert: ContainerHighCPUUsage
+    expr: rate(container_cpu_usage_seconds_total{name!=""}[1m]) * 100 > 90
+    for: 5m
+    labels:
+      severity: warning
+      component: docker
+      environment: production
+    annotations:
+      summary: "Container {{ $labels.name }} high CPU usage"
+      description: "Container CPU usage is {{ $value }}%"
+
+  # Container Disk I/O Saturation
+  - alert: ContainerDiskIOSaturation
+    expr: rate(container_fs_writes_bytes_total{name!=""}[5m]) > 50 * 1024 * 1024
+    for: 10m
+    labels:
+      severity: warning
+      component: docker
+      environment: production
+    annotations:
+      summary: "Container {{ $labels.name }} high disk I/O"
+      description: "Container is writing {{ $value | humanize }}B/s to disk"
+
+  # Too Many Containers
+  - alert: TooManyContainers
+    expr: count(container_last_seen{name!=""}) > 50
+    for: 5m
+    labels:
+      severity: info
+      component: docker
+      environment: production
+    annotations:
+      summary: "High number of containers running"
+      description: "{{ $value }} containers are currently running"

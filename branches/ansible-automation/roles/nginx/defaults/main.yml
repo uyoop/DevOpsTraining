@@ -1,0 +1,12 @@
+---
+# Default variables for nginx role
+
+nginx_port: 80
+nginx_ssl_port: 443
+nginx_worker_processes: auto
+nginx_worker_connections: 1024
+nginx_sendfile: 'on'
+nginx_tcp_nopush: 'on'
+nginx_client_max_body_size: 20m
+nginx_gzip: 'on'
+nginx_gzip_types: "text/plain text/css text/javascript application/json"

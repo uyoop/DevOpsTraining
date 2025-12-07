@@ -1,0 +1,312 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # TRAEFIK - Reverse Proxy + SSL
+  # ==========================================
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - CF_API_EMAIL=${CLOUDFLARE_EMAIL}
+      - CF_DNS_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config/traefik/traefik.yml:/traefik.yml:ro
+      - ./config/traefik/dynamic:/dynamic:ro
+      - traefik-acme:/acme
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.entrypoints=https"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)"
+      - "traefik.http.routers.traefik.tls=true"
+      - "traefik.http.routers.traefik.tls.certresolver=cloudflare"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.middlewares=authelia@docker"
+
+  # ==========================================
+  # AUTHELIA - 2FA / SSO
+  # ==========================================
+  authelia:
+    image: authelia/authelia:latest
+    container_name: authelia
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - proxy
+      - backend
+    expose:
+      - 9091
+    volumes:
+      - ./config/authelia:/config
+    environment:
+      - TZ=${TIMEZONE}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.authelia.entrypoints=https"
+      - "traefik.http.routers.authelia.rule=Host(`auth.${DOMAIN}`)"
+      - "traefik.http.routers.authelia.tls=true"
+      - "traefik.http.routers.authelia.tls.certresolver=cloudflare"
+      - "traefik.http.middlewares.authelia.forwardauth.address=http://authelia:9091/api/verify?rd=https://auth.${DOMAIN}"
+      - "traefik.http.middlewares.authelia.forwardauth.trustForwardHeader=true"
+      - "traefik.http.middlewares.authelia.forwardauth.authResponseHeaders=Remote-User,Remote-Groups,Remote-Name,Remote-Email"
+
+  # ==========================================
+  # CROWDSEC - Protection contre intrusions
+  # ==========================================
+  crowdsec:
+    image: crowdsecurity/crowdsec:latest
+    container_name: crowdsec
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - proxy
+    environment:
+      - COLLECTIONS=crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/whitelist-good-actors
+      - GID=1000
+    volumes:
+      - crowdsec-db:/var/lib/crowdsec/data/
+      - crowdsec-config:/etc/crowdsec/
+      - traefik-logs:/var/log/traefik:ro
+      - /var/log/auth.log:/var/log/auth.log:ro
+
+  crowdsec-bouncer:
+    image: fbonalair/traefik-crowdsec-bouncer:latest
+    container_name: crowdsec-bouncer
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - proxy
+    environment:
+      - CROWDSEC_BOUNCER_API_KEY=${CROWDSEC_BOUNCER_KEY}
+      - CROWDSEC_AGENT_HOST=crowdsec:8080
+    depends_on:
+      - crowdsec
+
+  # ==========================================
+  # BOOKSTACK DATABASE
+  # ==========================================
+  bookstack-db:
+    image: mysql:8.0
+    container_name: bookstack_db
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - database
+    environment:
+      - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/db_root_password
+      - MYSQL_DATABASE=${DB_DATABASE}
+      - MYSQL_USER=${DB_USER}
+      - MYSQL_PASSWORD_FILE=/run/secrets/db_password
+    volumes:
+      - bookstack-db-data:/var/lib/mysql
+      - ./config/mysql/my.cnf:/etc/mysql/conf.d/my.cnf:ro
+    secrets:
+      - db_root_password
+      - db_password
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ==========================================
+  # BOOKSTACK APPLICATION
+  # ==========================================
+  bookstack:
+    image: lscr.io/linuxserver/bookstack:latest
+    container_name: bookstack
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    networks:
+      - proxy
+      - backend
+      - database
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TIMEZONE}
+      - APP_URL=https://bookstack.${DOMAIN}
+      - DB_HOST=bookstack-db
+      - DB_PORT=3306
+      - DB_DATABASE=${DB_DATABASE}
+      - DB_USERNAME=${DB_USER}
+      - DB_PASSWORD_FILE=/run/secrets/db_password
+      - MAIL_DRIVER=${MAIL_DRIVER}
+      - MAIL_HOST=${MAIL_HOST}
+      - MAIL_PORT=${MAIL_PORT}
+      - MAIL_FROM=${MAIL_FROM}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD_FILE=/run/secrets/mail_password
+      - MAIL_ENCRYPTION=${MAIL_ENCRYPTION}
+    volumes:
+      - bookstack-app-data:/config
+    secrets:
+      - db_password
+      - mail_password
+    depends_on:
+      bookstack-db:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bookstack.entrypoints=https"
+      - "traefik.http.routers.bookstack.rule=Host(`bookstack.${DOMAIN}`)"
+      - "traefik.http.routers.bookstack.tls=true"
+      - "traefik.http.routers.bookstack.tls.certresolver=cloudflare"
+      - "traefik.http.routers.bookstack.middlewares=authelia@docker,security-headers@file,rate-limit@file"
+      - "traefik.http.services.bookstack.loadbalancer.server.port=80"
+
+  # ==========================================
+  # BACKUP AUTOMATISÉ
+  # ==========================================
+  backup:
+    image: mazzolino/restic:latest
+    container_name: bookstack-backup
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - backend
+    environment:
+      - RESTIC_REPOSITORY=${BACKUP_REPOSITORY}
+      - RESTIC_PASSWORD_FILE=/run/secrets/backup_password
+      - BACKUP_CRON=${BACKUP_CRON:-0 2 * * *}
+      - RESTIC_FORGET_ARGS=--keep-last 10 --keep-daily 7 --keep-weekly 4 --keep-monthly 6
+      - TZ=${TIMEZONE}
+    volumes:
+      - bookstack-db-data:/data/db:ro
+      - bookstack-app-data:/data/app:ro
+      - restic-cache:/cache
+    secrets:
+      - backup_password
+
+  # ==========================================
+  # MONITORING - Prometheus + Grafana
+  # ==========================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - backend
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+    volumes:
+      - ./config/prometheus:/etc/prometheus
+      - prometheus-data:/prometheus
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.entrypoints=https"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${DOMAIN}`)"
+      - "traefik.http.routers.prometheus.tls=true"
+      - "traefik.http.routers.prometheus.middlewares=authelia@docker"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - backend
+      - proxy
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}
+      - GF_SECURITY_ADMIN_PASSWORD_FILE=/run/secrets/grafana_password
+      - GF_SERVER_ROOT_URL=https://grafana.${DOMAIN}
+    volumes:
+      - grafana-data:/var/lib/grafana
+    secrets:
+      - grafana_password
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.entrypoints=https"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.${DOMAIN}`)"
+      - "traefik.http.routers.grafana.tls=true"
+      - "traefik.http.routers.grafana.middlewares=authelia@docker"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - backend
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+
+# ==========================================
+# NETWORKS
+# ==========================================
+networks:
+  proxy:
+    name: proxy
+    driver: bridge
+  backend:
+    name: backend
+    driver: bridge
+    internal: true
+  database:
+    name: database
+    driver: bridge
+    internal: true
+
+# ==========================================
+# VOLUMES
+# ==========================================
+volumes:
+  traefik-acme:
+  traefik-logs:
+  crowdsec-db:
+  crowdsec-config:
+  bookstack-db-data:
+  bookstack-app-data:
+  restic-cache:
+  prometheus-data:
+  grafana-data:
+
+# ==========================================
+# SECRETS
+# ==========================================
+secrets:
+  db_root_password:
+    file: ./secrets/db_root_password.txt
+  db_password:
+    file: ./secrets/db_password.txt
+  mail_password:
+    file: ./secrets/mail_password.txt
+  backup_password:
+    file: ./secrets/backup_password.txt
+  grafana_password:
+    file: ./secrets/grafana_password.txt

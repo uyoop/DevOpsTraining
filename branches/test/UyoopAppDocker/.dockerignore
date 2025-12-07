@@ -1,0 +1,30 @@
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+*.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data (sera monté via volume)
+data/*.db
+data/*.db-journal
+
+# Logs
+*.log
+
+# Docker
+.dockerignore
+docker-compose.override.yml

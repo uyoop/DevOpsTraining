@@ -1,0 +1,44 @@
+---
+# Role: postgresql
+# Description: Install and configure PostgreSQL server
+
+- name: Install PostgreSQL
+  apt:
+    name:
+      - postgresql
+      - postgresql-contrib
+      - python3-psycopg2
+    state: present
+  tags: [postgresql, install]
+
+- name: Start PostgreSQL service
+  systemd:
+    name: postgresql
+    state: started
+    enabled: yes
+  tags: [postgresql, service]
+
+- name: Create PostgreSQL admin user
+  postgresql_user:
+    name: "{{ pg_admin_user | default('postgres') }}"
+    password: "{{ pg_admin_password | default('postgres') }}"
+    role_attr_flags: SUPERUSER,CREATEDB,CREATEROLE
+    state: present
+  become: yes
+  become_user: postgres
+  tags: [postgresql, user]
+
+- name: Verify PostgreSQL installation
+  postgresql_query:
+    db: postgres
+    query: "SELECT version();"
+  changed_when: false
+  register: pg_version
+  become: yes
+  become_user: postgres
+  tags: [postgresql, verify]
+
+- name: Display PostgreSQL version
+  debug:
+    msg: "{{ pg_version.query_result[0][0] }}"
+  tags: [postgresql, verify]

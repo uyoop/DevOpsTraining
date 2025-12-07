@@ -1,0 +1,63 @@
+---
+# Role: docker
+# Description: Install Docker Engine and Docker Compose
+
+- name: Install Docker prerequisites
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - software-properties-common
+      - gnupg
+      - lsb-release
+    state: present
+  tags: [docker, install]
+
+- name: Add Docker GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+  tags: [docker, install]
+
+- name: Add Docker repository
+  apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+  tags: [docker, install]
+
+- name: Install Docker Engine
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+  tags: [docker, install]
+
+- name: Start Docker service
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+  tags: [docker, service]
+
+- name: Add user to docker group
+  user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes
+  tags: [docker, user]
+
+- name: Verify Docker installation
+  command: docker --version
+  changed_when: false
+  register: docker_version
+  tags: [docker, verify]
+
+- name: Display Docker version
+  debug:
+    msg: "{{ docker_version.stdout }}"
+  tags: [docker, verify]

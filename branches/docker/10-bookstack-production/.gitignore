@@ -1,0 +1,5 @@
+.env
+secrets/*.txt
+backups/
+*.log
+acme.json

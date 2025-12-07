@@ -1,0 +1,9 @@
+---
+# Handlers for system-update role
+
+- name: Reboot system
+  reboot:
+    msg: "System reboot after package update"
+    delay: "{{ system_update_reboot_delay }}"
+    reboot_timeout: 600
+  listen: "trigger_reboot"

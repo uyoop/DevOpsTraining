@@ -1,0 +1,45 @@
+# Traefik Dynamic Configuration
+# ==============================================================================
+
+http:
+  routers:
+    harbor-http:
+      rule: "Host(`{{ HARBOR_HOSTNAME }}`)"
+      entryPoints:
+        - web
+      middlewares:
+        - redirect-to-https
+      service: harbor
+
+  middlewares:
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+    
+    compress:
+      compress:
+        minResponseBodyBytes: 1000
+    
+    rate-limit:
+      rateLimit:
+        average: 100
+        period: 1m
+        burst: 50
+
+  services:
+    harbor:
+      loadBalancer:
+        servers:
+          - url: "http://harbor:8080"
+
+tls:
+  options:
+    default:
+      minVersion: TLSv1.2
+      sniStrict: true
+      cipherSuites:
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384

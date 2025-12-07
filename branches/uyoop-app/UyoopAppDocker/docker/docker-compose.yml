@@ -1,0 +1,42 @@
+services:
+  # Service Nginx pour servir l'application
+  nginx:
+    image: nginx:alpine
+    container_name: uyoop-nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ../public:/var/www/html/public:ro
+      - ../src:/var/www/html/src:ro
+      - ../data:/var/www/html/data
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - php
+    networks:
+      - uyoop-network
+    restart: unless-stopped
+
+  # Service PHP-FPM
+  php:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: uyoop-php
+    volumes:
+      - ../public:/var/www/html/public
+      - ../src:/var/www/html/src
+      - ../data:/var/www/html/data
+    networks:
+      - uyoop-network
+    restart: unless-stopped
+    environment:
+      - PHP_MEMORY_LIMIT=256M
+      - PHP_UPLOAD_MAX_FILESIZE=10M
+
+networks:
+  uyoop-network:
+    driver: bridge
+
+volumes:
+  data:
+    driver: local

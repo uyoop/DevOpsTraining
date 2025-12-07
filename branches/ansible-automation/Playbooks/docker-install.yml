@@ -1,0 +1,34 @@
+---
+# Playbook: Installation de Docker
+# Description: Installer Docker, Docker Compose et configurer le daemon
+# Usage: ansible-playbook Playbooks/docker-install.yml -i inventory.ini
+# Tags: containers, docker, infrastructure
+
+- name: Docker Installation & Configuration
+  hosts: "{{ target_hosts | default('all') }}"
+  become: yes
+  gather_facts: yes
+  tags: [containers, docker]
+
+  roles:
+    - role: docker
+      tags: [docker-install]
+
+  post_tasks:
+    - name: Verify Docker installation
+      command: docker --version
+      changed_when: false
+      register: docker_version
+
+    - name: Docker info
+      debug:
+        msg: "{{ docker_version.stdout }}"
+
+    - name: Docker Compose version
+      command: docker compose version
+      changed_when: false
+      register: compose_version
+
+    - name: Compose info
+      debug:
+        msg: "{{ compose_version.stdout }}"

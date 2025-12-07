@@ -1,0 +1,15 @@
+---
+# common/tasks/main.yml - Tâches communes à tous les serveurs
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Ensure common dependencies are present
+  apt:
+    name:
+      - git
+      - curl
+      - wget
+    state: present

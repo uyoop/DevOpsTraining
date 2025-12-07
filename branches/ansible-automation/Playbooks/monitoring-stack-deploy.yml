@@ -1,0 +1,40 @@
+---
+# Playbook: Stack Monitoring Complète
+# Description: Déployer Prometheus + Grafana + Alertmanager pour monitoring
+# Usage: ansible-playbook Playbooks/monitoring-stack-deploy.yml -i inventory.ini
+# Tags: monitoring, observability, prometheus
+
+- name: Monitoring Stack Deployment
+  hosts: "{{ target_hosts | default('monitoring_servers') }}"
+  become: yes
+  gather_facts: yes
+  tags: [monitoring, observability]
+
+  roles:
+    - role: prometheus
+      tags: [prometheus]
+    - role: grafana
+      tags: [grafana]
+    - role: alertmanager
+      tags: [alertmanager]
+
+  post_tasks:
+    - name: Prometheus health
+      uri:
+        url: "http://localhost:9090/-/healthy"
+        method: GET
+      changed_when: false
+      register: prom_health
+
+    - name: Grafana health
+      uri:
+        url: "http://localhost:3000/api/health"
+        method: GET
+      changed_when: false
+      register: grafana_health
+
+    - name: Monitoring stack status
+      debug:
+        msg: |
+          Prometheus: {{ prom_health.status | default('ERROR') }}
+          Grafana: {{ grafana_health.status | default('ERROR') }}

@@ -1,0 +1,122 @@
+# Prometheus Alert Rules for Harbor
+# ==============================================================================
+
+groups:
+  - name: harbor
+    interval: 30s
+    rules:
+      # Harbor Service Health
+      - alert: HarborDown
+        expr: up{job="harbor-core"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Harbor service is down"
+          description: "Harbor Core has been down for more than 5 minutes"
+
+      - alert: HarborRegistryDown
+        expr: up{job="harbor-registry"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Harbor Registry is down"
+          description: "Harbor Registry has been down for more than 5 minutes"
+
+      # Database Alerts
+      - alert: PostgreSQLDown
+        expr: up{job="postgres"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database is not responding"
+
+      - alert: PostgreSQLHighConnections
+        expr: postgresql_connections{state="active"} > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL has high connection count"
+          description: "Active connections: {{ $value }}"
+
+      # Redis Alerts
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis master is not responding"
+
+      - alert: RedisHighMemory
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis memory usage is high"
+          description: "Redis memory usage: {{ $value | humanizePercentage }}"
+
+      # Disk Space Alerts
+      - alert: LowDiskSpace
+        expr: node_filesystem_avail_bytes / node_filesystem_size_bytes < 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space"
+          description: "Available disk space: {{ $value | humanizePercentage }}"
+
+      # CPU Alerts
+      - alert: HighCPUUsage
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage: {{ $value }}%"
+
+      # Memory Alerts
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage: {{ $value }}%"
+
+      # Network Alerts
+      - alert: HighNetworkTraffic
+        expr: rate(node_network_transmit_bytes_total[5m]) > 100000000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High network traffic"
+          description: "Network TX rate: {{ $value | humanize }}B/s"
+
+      # Replication Alerts
+      - alert: PostgreSQLReplicationLag
+        expr: pg_replication_lag_seconds > 60
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL replication lag detected"
+          description: "Replication lag: {{ $value }}s"
+
+      - alert: PostgreSQLReplicationDown
+        expr: pg_replication_running == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL replication is not running"
+          description: "Replication process is stopped"

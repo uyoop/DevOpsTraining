@@ -1,0 +1,22 @@
+# Traefik Configuration
+http:
+  routers:
+    redirect:
+      rule: "HostRegexp(`{host:.+}`)"
+      entryPoints:
+        - web
+      middlewares:
+        - redirect-to-https
+      service: dummy
+
+  middlewares:
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+  services:
+    dummy:
+      loadBalancer:
+        servers:
+          - url: http://localhost:9000

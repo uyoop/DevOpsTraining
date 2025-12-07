@@ -1,0 +1,10 @@
+---
+# appserver/handlers/main.yml
+
+- name: Restart PHP-FPM
+  systemd:
+    name: php8.3-fpm
+    state: restarted
+  tags:
+    - appserver
+    - service

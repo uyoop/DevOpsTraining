@@ -1,0 +1,10 @@
+---
+# database/handlers/main.yml
+
+- name: Restart MySQL
+  systemd:
+    name: mysql
+    state: restarted
+  tags:
+    - database
+    - service

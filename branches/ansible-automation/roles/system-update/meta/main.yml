@@ -1,0 +1,19 @@
+---
+galaxy_info:
+  author: DevOps Team
+  description: System package update and patching role
+  company: Portfolio
+  license: MIT
+  min_ansible_version: '2.9'
+  platforms:
+    - name: Ubuntu
+      versions:
+        - '20.04'
+        - '22.04'
+    - name: Debian
+      versions:
+        - '11'
+        - '12'
+  tags: [system, updates, maintenance]
+
+dependencies: []

@@ -1,0 +1,9 @@
+---
+# database/meta/main.yml
+
+dependencies: []
+
+galaxy_info:
+  author: AFPA DevOps
+  description: MySQL database setup for Covoiturage application
+  min_ansible_version: 2.9

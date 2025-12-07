@@ -1,0 +1,9 @@
+---
+# Default variables for docker role
+
+docker_version: "latest"
+docker_compose_version: "latest"
+docker_daemon_options:
+  storage-driver: overlay2
+  log-driver: json-file
+docker_users: []

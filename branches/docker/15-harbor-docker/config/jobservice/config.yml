@@ -1,0 +1,25 @@
+job_loggers:
+  - sweeper:
+      duration: 168h
+  - webhook:
+      namespace: harbor_job_service_webhook
+
+job_pools:
+  - workers: 10
+    with_cri: false
+
+protocol: http
+port: 8080
+logger_type: stdout
+logger_level: info
+
+redis:
+  namespace: harbor_job_service
+  host: redis
+  port: 6379
+  password: ""
+  db_index: 2
+
+auth:
+  user: admin
+  password: ${HARBOR_ADMIN_PASSWORD}

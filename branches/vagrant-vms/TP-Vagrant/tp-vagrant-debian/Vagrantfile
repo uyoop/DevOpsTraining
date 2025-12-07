@@ -1,0 +1,39 @@
+# Étape 1 – Création d’une box Debian (base)
+#  Cahier des charges
+# Créer un projet Vagrant nommé tp-vagrant-debian contenant :
+# Un Vagrantfile minimal utilisant la box : bento/debian-13
+# Configuration demandée :
+# Nom de la VM : debian-base
+# Provider VirtualBox :
+# RAM : 1024 Mo
+# CPU : 1
+# Réseau privé :
+# IP fixe : 192.168.56.10
+# La VM doit :
+# se lancer avec vagrant up
+# être accessible en SSH via vagrant ssh
+# afficher un message personnalisé dans /etc/motd au provisionnement (ex : “VM TP – Debian Base”)
+# Livrables
+# un dossier (tp-vagrant-debian) sur votre github contenant :
+# Vagrantfile
+
+
+
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "bento/debian-13"
+  config.vm.define "debian-base"
+  
+  config.vm.network "private_network", ip: "192.168.56.10"
+  
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = "1024"
+    vb.cpus = 1
+  end
+  
+  config.vm.provision "shell", inline: <<-SHELL
+    echo "VM TP – Debian Base" > /etc/motd
+  SHELL
+end

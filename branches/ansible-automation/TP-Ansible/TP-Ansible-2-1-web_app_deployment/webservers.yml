@@ -1,0 +1,9 @@
+---
+# webservers.yml - Playbook dédié aux serveurs web
+
+- name: Configure webservers with Flask app
+  hosts: appservers
+  become: true
+  roles:
+    - common
+    - webserver

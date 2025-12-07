@@ -1,0 +1,31 @@
+---
+# common/tasks/main.yml - Tâches communes à tous les serveurs
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  tags:
+    - common
+    - install
+
+- name: Ensure common dependencies are present
+  apt:
+    name:
+      - git
+      - curl
+      - wget
+      - software-properties-common
+      - apt-transport-https
+      - ca-certificates
+    state: present
+  tags:
+    - common
+    - install
+
+- name: Set timezone to Europe/Paris
+  timezone:
+    name: Europe/Paris
+  tags:
+    - common
+    - config

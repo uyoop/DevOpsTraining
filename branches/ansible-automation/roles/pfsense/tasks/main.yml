@@ -1,0 +1,7 @@
+---
+# TODO: Implement tasks for this role
+
+- name: Placeholder
+  debug:
+    msg: "This role needs implementation"
+  tags: [placeholder]

@@ -1,0 +1,14 @@
+---
+# Handlers for postgresql role
+
+- name: Restart PostgreSQL
+  systemd:
+    name: postgresql
+    state: restarted
+  listen: "restart_postgresql"
+
+- name: Reload PostgreSQL config
+  command: /usr/lib/postgresql/14/bin/pg_ctl reload -D /var/lib/postgresql/14/main
+  become: yes
+  become_user: postgres
+  listen: "reload_postgresql"

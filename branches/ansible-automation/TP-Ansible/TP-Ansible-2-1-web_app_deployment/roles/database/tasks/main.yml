@@ -1,0 +1,70 @@
+---
+# database/tasks/main.yml - Installation et configuration de MySQL
+
+- name: Install MySQL server and dependencies
+  apt:
+    name:
+      - mysql-server
+      - python3-pymysql
+    state: present
+  tags:
+    - database
+    - install
+
+- name: Ensure MySQL service is enabled and started
+  systemd:
+    name: mysql
+    enabled: yes
+    state: started
+  tags:
+    - database
+    - service
+
+- name: Create MySQL database
+  mysql_db:
+    name: "{{ db.name }}"
+    state: present
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+  tags:
+    - database
+    - config
+
+- name: Create MySQL user
+  mysql_user:
+    name: "{{ db.user }}"
+    password: "{{ db.password }}"
+    priv: "{{ db.name }}.*:ALL"
+    host: localhost
+    state: present
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+  tags:
+    - database
+    - config
+    - security
+
+- name: Copy database schema
+  copy:
+    src: "{{ playbook_dir }}/Covoiturage/schema.sql"
+    dest: "/tmp/schema.sql"
+    mode: 0644
+  tags:
+    - database
+    - schema
+
+- name: Import database schema
+  mysql_db:
+    name: "{{ db.name }}"
+    state: import
+    target: /tmp/schema.sql
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+  tags:
+    - database
+    - schema
+
+- name: Remove temporary schema file
+  file:
+    path: /tmp/schema.sql
+    state: absent
+  tags:
+    - database
+    - cleanup

@@ -1,0 +1,120 @@
+---
+# Playbook Ansible pour déployer UyoopApp avec Docker sur un serveur distant
+
+- name: Déploiement UyoopApp avec Docker
+  hosts: uyoop_servers
+  become: yes
+  vars:
+    app_name: uyoop
+    app_dir: /opt/uyoop
+    app_port: 8080
+    docker_compose_version: "v2.23.0"
+  
+  tasks:
+    - name: Installer les dépendances système
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - git
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Ajouter la clé GPG Docker
+      apt_key:
+        url: https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Ajouter le repository Docker
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} stable"
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Installer Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Démarrer et activer Docker
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Créer le répertoire de l'application
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copier les fichiers de l'application
+      synchronize:
+        src: "{{ playbook_dir }}/"
+        dest: "{{ app_dir }}/"
+        delete: yes
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=data/*.db"
+          - "--exclude=*.md"
+
+    - name: Créer le répertoire data
+      file:
+        path: "{{ app_dir }}/data"
+        state: directory
+        mode: '0755'
+        owner: www-data
+        group: www-data
+
+    - name: Arrêter les conteneurs existants
+      command: docker compose -f docker/docker-compose.yml down
+      args:
+        chdir: "{{ app_dir }}"
+      ignore_errors: yes
+
+    - name: Construire et démarrer les conteneurs
+      command: docker compose -f docker/docker-compose.yml up -d --build
+      args:
+        chdir: "{{ app_dir }}"
+
+    - name: Attendre que les services soient prêts
+      wait_for:
+        port: "{{ app_port }}"
+        delay: 5
+        timeout: 60
+
+    - name: Vérifier le statut des conteneurs
+      command: docker compose -f docker/docker-compose.yml ps
+      args:
+        chdir: "{{ app_dir }}"
+      register: docker_status
+
+    - name: Afficher le statut
+      debug:
+        var: docker_status.stdout_lines
+
+    - name: Configurer le firewall (UFW)
+      ufw:
+        rule: allow
+        port: "{{ app_port }}"
+        proto: tcp
+      when: ansible_os_family == "Debian"
+      ignore_errors: yes
+
+  handlers:
+    - name: Redémarrer Docker
+      systemd:
+        name: docker
+        state: restarted

@@ -1,0 +1,25 @@
+---
+# Playbook: Configuration du pare-feu
+# Description: Activer et configurer UFW/firewalld avec règles personnalisées
+# Usage: ansible-playbook Playbooks/firewall-configure.yml -i inventory.ini -e "firewall_allowed_ports=[22,80,443]"
+# Tags: security, firewall, network
+
+- name: Firewall Configuration
+  hosts: "{{ target_hosts | default('all') }}"
+  become: yes
+  gather_facts: yes
+  tags: [security, firewall]
+
+  roles:
+    - role: firewall
+      tags: [firewall-rules]
+
+  post_tasks:
+    - name: Firewall status
+      shell: ufw status | head -5
+      changed_when: false
+      register: fw_status
+
+    - name: Show firewall status
+      debug:
+        msg: "{{ fw_status.stdout_lines }}"

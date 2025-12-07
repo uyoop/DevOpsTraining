@@ -1,0 +1,147 @@
+---
+- hosts: all
+  become: yes
+
+  vars:
+    registry_base: /opt/registry-secure
+    registry_tls_port: 443
+    registry_user: testuser
+    registry_password: testpassword
+  
+  tasks:
+    - name: Mettre à jour les paquets
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+    
+    - name: Installer les dépendances
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - software-properties-common
+        state: present
+    
+    - name: Ajouter la clé GPG de Docker
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+    
+    - name: Ajouter le dépôt Docker
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+    
+    - name: Installer Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+    
+    - name: Ajouter l'utilisateur vagrant au groupe docker
+      user:
+        name: vagrant
+        groups: docker
+        append: yes
+    
+    - name: Activer et démarrer le service Docker
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+    
+    - name: Installer Docker Compose (version autonome)
+      shell: |
+        curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+        chmod +x /usr/local/bin/docker-compose
+      args:
+        creates: /usr/local/bin/docker-compose
+
+    - name: Creer l'arborescence du registry
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ registry_base }}"
+        - "{{ registry_base }}/data"
+        - "{{ registry_base }}/certs"
+        - "{{ registry_base }}/auth"
+
+    - name: Generer le certificat autosigne pour localhost
+      command: >
+        openssl req -newkey rsa:4096 -nodes -sha256
+        -keyout {{ registry_base }}/certs/localhost.key
+        -x509 -days 365 -out {{ registry_base }}/certs/localhost.crt
+        -subj /CN=localhost
+      args:
+        creates: "{{ registry_base }}/certs/localhost.crt"
+
+    - name: Creer le dossier de confiance Docker pour le cert
+      file:
+        path: "/etc/docker/certs.d/localhost:{{ registry_tls_port }}"
+        state: directory
+        mode: '0755'
+
+    - name: Rendre Docker confiant envers le certificat
+      copy:
+        src: "{{ registry_base }}/certs/localhost.crt"
+        dest: "/etc/docker/certs.d/localhost:{{ registry_tls_port }}/ca.crt"
+        remote_src: yes
+      notify: Restart docker
+
+    - name: Generer le fichier htpasswd
+      shell: >
+        docker run --rm httpd:2.4-alpine
+        htpasswd -Bbn {{ registry_user }} {{ registry_password }} > {{ registry_base }}/auth/htpasswd
+      args:
+        creates: "{{ registry_base }}/auth/htpasswd"
+      changed_when: false
+
+    - name: Deployer le docker-compose du registry
+      copy:
+        dest: "{{ registry_base }}/docker-compose.yml"
+        mode: '0644'
+        content: |
+          version: '3.7'
+          services:
+            registry:
+              image: registry:2
+              container_name: mon-registry
+              restart: always
+              ports:
+                - "{{ registry_tls_port }}:443"
+              environment:
+                REGISTRY_HTTP_ADDR: 0.0.0.0:443
+                REGISTRY_HTTP_TLS_CERTIFICATE: /certs/localhost.crt
+                REGISTRY_HTTP_TLS_KEY: /certs/localhost.key
+                REGISTRY_AUTH: htpasswd
+                REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
+                REGISTRY_AUTH_HTPASSWD_REALM: "Registry Realm"
+              volumes:
+                - ./data:/var/lib/registry
+                - ./certs:/certs
+                - ./auth:/auth
+
+    - name: Demarrer le registry en compose
+      shell: docker compose up -d
+      args:
+        chdir: "{{ registry_base }}"
+    
+    - name: Installer Alpine pour les tests
+      shell: docker pull alpine
+      become_user: root
+      become: yes
+
+  handlers:
+    - name: Restart docker
+      systemd:
+        name: docker
+        state: restarted

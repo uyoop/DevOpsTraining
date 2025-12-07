@@ -1,0 +1,30 @@
+---
+# Playbook: Installation PostgreSQL
+# Description: Déployer PostgreSQL avec replication, backup WAL, PITR
+# Usage: ansible-playbook Playbooks/postgresql-install.yml -i inventory.ini -l postgres_servers
+# Tags: database, postgresql, data
+
+- name: PostgreSQL Installation & Replication
+  hosts: "{{ target_hosts | default('postgres_servers') }}"
+  become: yes
+  gather_facts: yes
+  tags: [database, postgresql]
+
+  roles:
+    - role: postgresql
+      tags: [postgresql-install]
+    - role: postgresql-replication
+      tags: [postgresql-replication]
+      when: inventory_hostname in groups.get('postgres_replicas', [])
+
+  post_tasks:
+    - name: PostgreSQL health check
+      postgresql_query:
+        db: postgres
+        query: "SELECT version();"
+      changed_when: false
+      register: pg_version
+
+    - name: PostgreSQL version
+      debug:
+        msg: "{{ pg_version.query_result[0][0] }}"

@@ -1,0 +1,28 @@
+---
+# Playbook: Configuration et Sauvegarde
+# Description: Configurer les sauvegardes automatiques avec Restic/Bacula
+# Usage: ansible-playbook Playbooks/backup-setup.yml -i inventory.ini
+# Tags: backup, disaster-recovery, infrastructure
+
+- name: Backup Infrastructure Setup
+  hosts: "{{ target_hosts | default('all') }}"
+  become: yes
+  gather_facts: yes
+  tags: [backup, disaster-recovery]
+
+  roles:
+    - role: backup-agent
+      tags: [backup-agent]
+    - role: restic
+      tags: [restic]
+
+  post_tasks:
+    - name: Backup verification
+      shell: restic snapshots 2>/dev/null | wc -l
+      changed_when: false
+      failed_when: false
+      register: backup_count
+
+    - name: Backup status
+      debug:
+        msg: "Backup snapshots: {{ backup_count.stdout | default('0') }}"

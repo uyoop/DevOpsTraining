@@ -1,0 +1,102 @@
+groups:
+- name: node_alerts
+  interval: 1m
+  rules:
+  # High CPU Load Alert
+  - alert: HighCPULoad
+    expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+    for: 5m
+    labels:
+      severity: warning
+      component: system
+    annotations:
+      summary: "High CPU load on {{ $labels.instance }}"
+      description: "CPU load is above 80% (current value: {{ $value | humanizePercentage }})"
+
+  # Critical CPU Load Alert
+  - alert: CriticalCPULoad
+    expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 95
+    for: 2m
+    labels:
+      severity: critical
+      component: system
+    annotations:
+      summary: "Critical CPU load on {{ $labels.instance }}"
+      description: "CPU load is critically high (current value: {{ $value | humanizePercentage }})"
+
+  # High Memory Usage Alert
+  - alert: HighMemoryUsage
+    expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+      component: system
+    annotations:
+      summary: "High memory usage on {{ $labels.instance }}"
+      description: "Memory usage is above 80% (current value: {{ $value | humanizePercentage }})"
+
+  # Critical Memory Usage Alert
+  - alert: CriticalMemoryUsage
+    expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 95
+    for: 2m
+    labels:
+      severity: critical
+      component: system
+    annotations:
+      summary: "Critical memory usage on {{ $labels.instance }}"
+      description: "Memory usage is critically high (current value: {{ $value | humanizePercentage }})"
+
+  # High Disk Usage Alert
+  - alert: HighDiskUsage
+    expr: (node_filesystem_size_bytes{fstype=~"ext4|xfs"} - node_filesystem_free_bytes{fstype=~"ext4|xfs"}) / node_filesystem_size_bytes{fstype=~"ext4|xfs"} * 100 > 85
+    for: 5m
+    labels:
+      severity: warning
+      component: disk
+    annotations:
+      summary: "High disk usage on {{ $labels.instance }}"
+      description: "Disk usage on {{ $labels.mountpoint }} is above 85% (current value: {{ $value | humanizePercentage }})"
+
+  # Critical Disk Usage Alert
+  - alert: CriticalDiskUsage
+    expr: (node_filesystem_size_bytes{fstype=~"ext4|xfs"} - node_filesystem_free_bytes{fstype=~"ext4|xfs"}) / node_filesystem_size_bytes{fstype=~"ext4|xfs"} * 100 > 95
+    for: 2m
+    labels:
+      severity: critical
+      component: disk
+    annotations:
+      summary: "Critical disk usage on {{ $labels.instance }}"
+      description: "Disk usage on {{ $labels.mountpoint }} is critically high (current value: {{ $value | humanizePercentage }})"
+
+  # Unusual Memory Growth Alert
+  - alert: UnusualMemoryGrowth
+    expr: deriv(node_memory_MemAvailable_bytes[30m]) < -10 * 1024 * 1024
+    for: 10m
+    labels:
+      severity: warning
+      component: system
+    annotations:
+      summary: "Unusual memory consumption rate on {{ $labels.instance }}"
+      description: "Memory is being consumed at an unusual rate ({{ $value | humanize }}B/s)"
+
+  # High Load Average Alert
+  - alert: HighLoadAverage
+    expr: node_load5 / count(node_cpu_seconds_total{mode="idle"}) without(cpu, mode) > 1.5
+    for: 5m
+    labels:
+      severity: warning
+      component: system
+    annotations:
+      summary: "High load average on {{ $labels.instance }}"
+      description: "Load average is above 1.5x CPU count (current value: {{ $value }})"
+
+  # Instance Down Alert
+  - alert: InstanceDown
+    expr: up{job="node-exporter"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      component: system
+    annotations:
+      summary: "Instance {{ $labels.instance }} is down"
+      description: "Node Exporter on {{ $labels.instance }} has been down for more than 1 minute"

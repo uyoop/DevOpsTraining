@@ -1,0 +1,67 @@
+groups:
+- name: recording_rules_production
+  interval: 1m
+  rules:
+  # System Metrics
+  - record: instance:node_cpu_usage:avg5m
+    expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+
+  - record: instance:node_memory_usage:percent
+    expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100
+
+  - record: instance:node_disk_usage:percent
+    expr: (node_filesystem_size_bytes{fstype=~"ext4|xfs"} - node_filesystem_free_bytes{fstype=~"ext4|xfs"}) / node_filesystem_size_bytes{fstype=~"ext4|xfs"} * 100
+
+  - record: instance:node_load_normalized:load5
+    expr: node_load5 / count(node_cpu_seconds_total{mode="idle"}) without(cpu, mode)
+
+  # Network Metrics
+  - record: instance:node_network_receive:rate5m
+    expr: sum by(instance) (rate(node_network_receive_bytes_total{device!~"lo|docker.*|veth.*"}[5m]))
+
+  - record: instance:node_network_transmit:rate5m
+    expr: sum by(instance) (rate(node_network_transmit_bytes_total{device!~"lo|docker.*|veth.*"}[5m]))
+
+  # Disk I/O Metrics
+  - record: instance:node_disk_read:rate5m
+    expr: sum by(instance) (rate(node_disk_read_bytes_total[5m]))
+
+  - record: instance:node_disk_write:rate5m
+    expr: sum by(instance) (rate(node_disk_written_bytes_total[5m]))
+
+  # Container Metrics
+  - record: container:cpu_usage:avg5m
+    expr: sum by(name) (rate(container_cpu_usage_seconds_total{name!=""}[5m])) * 100
+
+  - record: container:memory_usage:percent
+    expr: (container_memory_usage_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""}) * 100
+
+  - record: container:network_receive:rate5m
+    expr: sum by(name) (rate(container_network_receive_bytes_total{name!=""}[5m]))
+
+  - record: container:network_transmit:rate5m
+    expr: sum by(name) (rate(container_network_transmit_bytes_total{name!=""}[5m]))
+
+  - record: container:disk_read:rate5m
+    expr: sum by(name) (rate(container_fs_reads_bytes_total{name!=""}[5m]))
+
+  - record: container:disk_write:rate5m
+    expr: sum by(name) (rate(container_fs_writes_bytes_total{name!=""}[5m]))
+
+  # Aggregated Metrics
+  - record: cluster:cpu_usage:avg
+    expr: avg(instance:node_cpu_usage:avg5m)
+
+  - record: cluster:memory_usage:avg
+    expr: avg(instance:node_memory_usage:percent)
+
+  - record: cluster:disk_usage:avg
+    expr: avg(instance:node_disk_usage:percent)
+
+  # Service Availability
+  - record: job:up:avg
+    expr: avg by(job) (up)
+
+  # HTTP Probe Success Rate
+  - record: probe:success_rate:5m
+    expr: avg_over_time(probe_success[5m])

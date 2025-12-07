@@ -1,0 +1,23 @@
+---
+- name: Ad-hoc lab tasks (install/start nginx, touch file)
+  hosts: adhoc_lab
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Ensure nginx is installed
+      package:
+        name: nginx
+        state: present
+        update_cache: yes
+
+    - name: Ensure nginx is started and enabled
+      systemd:
+        name: nginx
+        state: started
+        enabled: true
+
+    - name: Create /tmp/file if missing (idempotent)
+      file:
+        path: /tmp/file
+        state: touch
+        mode: '0644'

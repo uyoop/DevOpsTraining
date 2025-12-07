@@ -1,0 +1,28 @@
+---
+# Role: system-update
+# Description: Update all packages and apply security patches
+
+- name: Update package cache
+  apt:
+    cache_valid_time: 3600
+  tags: [update]
+
+- name: Upgrade all packages
+  apt:
+    upgrade: dist
+    autoremove: yes
+    autoclean: yes
+  register: apt_upgrade
+  tags: [update]
+
+- name: Check if reboot is required
+  stat:
+    path: /var/run/reboot-required
+  register: reboot_required
+  changed_when: false
+  tags: [update]
+
+- name: Display upgrade summary
+  debug:
+    msg: "Packages upgraded. Reboot required: {{ reboot_required.stat.exists }}"
+  tags: [update]

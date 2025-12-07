@@ -1,0 +1,28 @@
+---
+# Playbook: Gestion des Certificats SSL/TLS
+# Description: Deployer Let's Encrypt, renouveller automatiquement les certificats
+# Usage: ansible-playbook Playbooks/ssl-certificate-renew.yml -i inventory.ini
+# Tags: security, ssl, certificates
+
+- name: SSL Certificate Management
+  hosts: "{{ target_hosts | default('all') }}"
+  become: yes
+  gather_facts: yes
+  tags: [security, ssl]
+
+  roles:
+    - role: letsencrypt
+      tags: [letsencrypt]
+    - role: certbot
+      tags: [certbot]
+
+  post_tasks:
+    - name: Certificate expiry check
+      shell: certbot certificates 2>/dev/null | grep "Expiry Date"
+      changed_when: false
+      failed_when: false
+      register: cert_expiry
+
+    - name: Certificates status
+      debug:
+        msg: "{{ cert_expiry.stdout_lines | default(['No certificates found']) }}"

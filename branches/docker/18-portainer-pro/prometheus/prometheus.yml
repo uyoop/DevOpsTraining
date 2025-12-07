@@ -1,0 +1,32 @@
+# Prometheus Configuration for Portainer Monitoring
+# ==============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'portainer-pro'
+    environment: 'production'
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Docker daemon metrics (if exposed)
+  - job_name: 'docker'
+    static_configs:
+      - targets: ['unix:///var/run/docker.sock']
+    metrics_path: '/metrics'
+    scheme: 'unix'
+
+  # Node Exporter (system metrics)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['localhost:9100']
+
+  # PostgreSQL (if metrics exported)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']

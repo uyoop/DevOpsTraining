@@ -1,0 +1,318 @@
+---
+- name: Deploy BookStack Production Secured
+  hosts: bookstack_servers
+  become: yes
+  vars:
+    app_user: bookstack
+    app_dir: /opt/bookstack-production
+    docker_compose_version: "2.23.0"
+    
+  tasks:
+    # ==========================================
+    # SYSTEM PREPARATION
+    # ==========================================
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install required packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - ufw
+          - fail2ban
+          - git
+          - gpg
+        state: present
+
+    # ==========================================
+    # DOCKER INSTALLATION
+    # ==========================================
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+
+    - name: Install Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+
+    - name: Start and enable Docker
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    # ==========================================
+    # USER AND PERMISSIONS
+    # ==========================================
+    - name: Create application user
+      user:
+        name: "{{ app_user }}"
+        shell: /bin/bash
+        groups: docker
+        append: yes
+
+    - name: Create application directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0755'
+
+    # ==========================================
+    # DEPLOY APPLICATION
+    # ==========================================
+    - name: Clone repository
+      git:
+        repo: https://github.com/CJenkins-AFPA/CJ-DEVOPS.git
+        dest: /tmp/cj-devops
+        version: docker
+        force: yes
+
+    - name: Copy BookStack files
+      copy:
+        src: /tmp/cj-devops/10-bookstack-production/
+        dest: "{{ app_dir }}/"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: preserve
+        remote_src: yes
+
+    - name: Make scripts executable
+      file:
+        path: "{{ app_dir }}/scripts/{{ item }}"
+        mode: '0755'
+      loop:
+        - install.sh
+        - backup.sh
+        - restore.sh
+        - hardening.sh
+
+    # ==========================================
+    # SECRETS GENERATION
+    # ==========================================
+    - name: Create secrets directory
+      file:
+        path: "{{ app_dir }}/secrets"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0700'
+
+    - name: Generate DB root password
+      shell: openssl rand -base64 32
+      register: db_root_pass
+      no_log: true
+
+    - name: Generate DB password
+      shell: openssl rand -base64 32
+      register: db_pass
+      no_log: true
+
+    - name: Generate backup password
+      shell: openssl rand -base64 32
+      register: backup_pass
+      no_log: true
+
+    - name: Generate Grafana password
+      shell: openssl rand -base64 32
+      register: grafana_pass
+      no_log: true
+
+    - name: Save secrets
+      copy:
+        content: "{{ item.content }}"
+        dest: "{{ app_dir }}/secrets/{{ item.file }}"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0600'
+      loop:
+        - { file: 'db_root_password.txt', content: "{{ db_root_pass.stdout }}" }
+        - { file: 'db_password.txt', content: "{{ db_pass.stdout }}" }
+        - { file: 'backup_password.txt', content: "{{ backup_pass.stdout }}" }
+        - { file: 'grafana_password.txt', content: "{{ grafana_pass.stdout }}" }
+        - { file: 'mail_password.txt', content: "{{ mail_password | default('changeme') }}" }
+      no_log: true
+
+    # ==========================================
+    # CONFIGURATION
+    # ==========================================
+    - name: Create .env file
+      template:
+        src: templates/env.j2
+        dest: "{{ app_dir }}/.env"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0600'
+
+    - name: Configure Traefik
+      template:
+        src: templates/traefik.yml.j2
+        dest: "{{ app_dir }}/config/traefik/traefik.yml"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0644'
+
+    - name: Configure Authelia
+      template:
+        src: templates/authelia-config.yml.j2
+        dest: "{{ app_dir }}/config/authelia/configuration.yml"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0644'
+
+    # ==========================================
+    # FIREWALL
+    # ==========================================
+    - name: Configure UFW - Allow SSH
+      ufw:
+        rule: allow
+        port: '22'
+        proto: tcp
+        comment: 'SSH'
+
+    - name: Configure UFW - Allow HTTP
+      ufw:
+        rule: allow
+        port: '80'
+        proto: tcp
+        comment: 'HTTP'
+
+    - name: Configure UFW - Allow HTTPS
+      ufw:
+        rule: allow
+        port: '443'
+        proto: tcp
+        comment: 'HTTPS'
+
+    - name: Enable UFW
+      ufw:
+        state: enabled
+        policy: deny
+
+    # ==========================================
+    # FAIL2BAN
+    # ==========================================
+    - name: Configure Fail2Ban for Docker
+      copy:
+        dest: /etc/fail2ban/jail.d/docker-bookstack.conf
+        content: |
+          [sshd]
+          enabled = true
+          maxretry = 3
+          bantime = 3600
+
+          [traefik-auth]
+          enabled = true
+          port = http,https
+          filter = traefik-auth
+          logpath = /var/log/traefik/access.log
+          maxretry = 5
+          bantime = 3600
+        mode: '0644'
+
+    - name: Configure Fail2Ban filter
+      copy:
+        dest: /etc/fail2ban/filter.d/traefik-auth.conf
+        content: |
+          [Definition]
+          failregex = ^<HOST> \- \S+ \[\] \"(GET|POST|HEAD) .+\" 401 .+$
+                      ^<HOST> \- \S+ \[\] \"(GET|POST|HEAD) .+\" 403 .+$
+          ignoreregex =
+        mode: '0644'
+
+    - name: Restart Fail2Ban
+      systemd:
+        name: fail2ban
+        state: restarted
+        enabled: yes
+
+    # ==========================================
+    # DOCKER NETWORKS
+    # ==========================================
+    - name: Create Docker networks
+      docker_network:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - proxy
+        - backend
+        - database
+
+    # ==========================================
+    # SYSTEM HARDENING
+    # ==========================================
+    - name: Apply system hardening
+      command: "{{ app_dir }}/scripts/hardening.sh"
+      become: yes
+      ignore_errors: yes
+
+    # ==========================================
+    # DEPLOY CONTAINERS
+    # ==========================================
+    - name: Start BookStack stack
+      community.docker.docker_compose:
+        project_src: "{{ app_dir }}"
+        state: present
+        pull: yes
+      become_user: "{{ app_user }}"
+
+    # ==========================================
+    # BACKUP CRON
+    # ==========================================
+    - name: Setup backup cron job
+      cron:
+        name: "BookStack daily backup"
+        minute: "0"
+        hour: "2"
+        job: "cd {{ app_dir }} && ./scripts/backup.sh >> /var/log/bookstack-backup.log 2>&1"
+        user: "{{ app_user }}"
+
+    # ==========================================
+    # FINAL CHECKS
+    # ==========================================
+    - name: Wait for BookStack to be ready
+      uri:
+        url: "https://bookstack.{{ domain }}"
+        validate_certs: no
+        status_code: 200,301,302
+      register: result
+      until: result.status in [200, 301, 302]
+      retries: 30
+      delay: 10
+      ignore_errors: yes
+
+    - name: Display credentials
+      debug:
+        msg:
+          - "BookStack déployé avec succès !"
+          - "URL: https://bookstack.{{ domain }}"
+          - "Authelia: https://auth.{{ domain }}"
+          - "Grafana: https://grafana.{{ domain }}"
+          - "Traefik: https://traefik.{{ domain }}"
+          - ""
+          - "Credentials BookStack par défaut:"
+          - "Email: admin@admin.com"
+          - "Password: password"
+          - ""
+          - "CHANGEZ IMMÉDIATEMENT CES IDENTIFIANTS !"
+          - ""
+          - "Secrets sauvegardés dans: {{ app_dir }}/secrets/"

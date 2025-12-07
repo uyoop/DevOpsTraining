@@ -1,0 +1,26 @@
+---
+# Playbook: Mise à jour sécurisée du système
+# Description: Mettre à jour tous les paquets, noyau, et configurations de sécurité
+# Usage: ansible-playbook Playbooks/system-update.yml -i inventory.ini
+# Tags: system, updates, maintenance
+
+- name: System Update & Maintenance
+  hosts: "{{ target_hosts | default('all') }}"
+  become: yes
+  gather_facts: yes
+  tags: [system, updates]
+
+  vars:
+    system_update_auto_reboot: false
+    system_update_reboot_delay: 300
+
+  roles:
+    - role: system-update
+      tags: [update]
+    - role: kernel-tuning
+      tags: [tuning]
+
+  post_tasks:
+    - name: Display summary
+      debug:
+        msg: "System update completed on {{ ansible_hostname }}"

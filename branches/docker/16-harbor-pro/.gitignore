@@ -1,0 +1,31 @@
+# Environment and Secrets
+.env
+.env.local
+.env.*.local
+*.key
+*.crt
+*.pem
+
+# Data directories
+data/
+backups/
+volumes/
+traefik/acme.json
+
+# Temporary files
+*.log
+*.tmp
+*.swp
+*.swo
+*~
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# System
+.directory
+Thumbs.db

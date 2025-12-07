@@ -1,0 +1,27 @@
+---
+# Playbook: Gestion des utilisateurs et accès
+# Description: Créer, modifier, supprimer utilisateurs, gérer SSH keys et sudoers
+# Usage: ansible-playbook Playbooks/user-management.yml -i inventory.ini
+# Tags: users, access, security
+
+- name: User Management
+  hosts: "{{ target_hosts | default('all') }}"
+  become: yes
+  gather_facts: no
+  tags: [users, access]
+
+  roles:
+    - role: user
+      tags: [create-users]
+    - role: ssh-hardening
+      tags: [ssh-security]
+
+  post_tasks:
+    - name: Verify users
+      shell: getent passwd | grep -E "^(app|jenkins|deploy)" | wc -l
+      register: user_count
+      changed_when: false
+
+    - name: User count
+      debug:
+        msg: "Total managed users: {{ user_count.stdout }}"

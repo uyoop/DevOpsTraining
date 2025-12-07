@@ -1,0 +1,29 @@
+---
+# Playbook: Installation de pfSense
+# Description: Déployer et configurer pfSense comme pare-feu/routeur
+# Usage: ansible-playbook Playbooks/pfsense-install.yml -i inventory.ini -l pfsense_servers
+# Tags: network, firewall, pfsense
+
+- name: pfSense Installation & Configuration
+  hosts: "{{ target_hosts | default('pfsense_servers') }}"
+  become: yes
+  gather_facts: yes
+  tags: [network, pfsense]
+
+  roles:
+    - role: pfsense
+      tags: [pfsense-install]
+    - role: pfsense-wan
+      tags: [pfsense-wan]
+    - role: pfsense-firewall-rules
+      tags: [pfsense-rules]
+
+  post_tasks:
+    - name: Verify pfSense services
+      shell: ps aux | grep -E "pfctl|nginx|php-fpm" | grep -v grep | wc -l
+      changed_when: false
+      register: pfsense_services
+
+    - name: Display service count
+      debug:
+        msg: "pfSense services running: {{ pfsense_services.stdout }}"
