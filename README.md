@@ -90,6 +90,29 @@ Déploiement de BookStack pour la documentation.
 - **Durée estimée** : 4-6h
 - **Niveau** : Avancé/Production
 
+### [11 - NetBox Docker (Basique)](./11-netbox-docker/)
+Gestion d'infrastructure réseau avec NetBox.
+- Docker Compose simple (PostgreSQL + Redis + NetBox)
+- 3 containers (app, worker, housekeeping)
+- API REST configuration
+- Device Type Library import
+- Documentation interactive
+- **Durée estimée** : 2h
+- **Niveau** : Débutant
+
+### [12 - NetBox Professionnel](./12-netbox-professionnel/) ⭐⭐
+**Production-ready IPAM/DCIM solution**.
+- **Architecture complète** : 6 services (NetBox, PostgreSQL, Redis, Traefik, Prometheus, Grafana)
+- **Sécurité** : Traefik v3 + SSL/TLS + Rate limiting + Security headers
+- **Monitoring** : Prometheus + Grafana avec dashboards
+- **Backup** : Scripts automatisés de sauvegarde/restauration
+- **API** : REST + GraphQL activés
+- **Automation** : Scripts import/export + Device Types
+- **Use Cases** : IPAM, DCIM, Circuits, Cables, Contacts
+- **Documentation** : Guide complet avec exemples API/Ansible
+- **Durée estimée** : 3-4h
+- **Niveau** : Avancé/Infrastructure
+
 ## 🎯 Objectifs Globaux
 
 À la fin de cette formation, vous serez capable de :
@@ -148,19 +171,20 @@ git checkout docker
 2. TP 02 - Commandes de base
 3. TP 03 - Docker Compose (partie 1)
 4. TP 09 - BookStack basique
+5. TP 11 - NetBox basique
 
 ### 🟡 Intermédiaire (Jour 3-4)
-5. TP 03 - Docker Compose (partie 2)
-6. TP 05 - Réseaux
-7. TP 06 - Volumes
-8. TP 04 - Registry Privé
+6. TP 03 - Docker Compose (partie 2)
+7. TP 05 - Réseaux
+8. TP 06 - Volumes
+9. TP 04 - Registry Privé
 
 ### 🔴 Avancé (Jour 5-7)
-9. TP 07 - Dockerfiles avancés
-10. TP 08 - Docker Swarm
+10. TP 07 - Dockerfiles avancés
+11. TP 08 - Docker Swarm
 
-### 🏆 Expert / Production (Jour 8-10)
-11. **TP 10 - BookStack Production Sécurisé** ⭐
+### 🏆 Expert / Production (Jour 8-12)
+12. **TP 10 - BookStack Production Sécurisé** ⭐
     - Architecture de sécurité multi-couches
     - Reverse proxy, 2FA, IDS/IPS
     - Monitoring et observabilité
@@ -168,7 +192,16 @@ git checkout docker
     - Automation avec Ansible
     - Hardening système complet
 
-> **💡 Note pour le TP10** : Ce TP représente une mise en production réelle et démontre des compétences DevOps avancées recherchées en entreprise. Parfait pour un portfolio professionnel.
+13. **TP 12 - NetBox Professionnel** ⭐⭐
+    - IPAM/DCIM solution complète
+    - Traefik reverse proxy
+    - Prometheus + Grafana monitoring
+    - API REST + GraphQL
+    - Device types import
+    - Backup/restore scripts
+    - Intégration automation
+
+> **💡 Note** : Les TP 10 et 12 représentent des mises en production réelles et démontrent des compétences DevOps avancées recherchées en entreprise. Parfaits pour un portfolio professionnel.
 
 ## 🔧 Outils Complémentaires
 
