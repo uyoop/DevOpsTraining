@@ -1,0 +1,139 @@
+groups:
+- name: production_node_alerts
+  interval: 1m
+  rules:
+  # Critical CPU Load
+  - alert: ProductionCriticalCPULoad
+    expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 95
+    for: 2m
+    labels:
+      severity: critical
+      component: system
+      environment: production
+    annotations:
+      summary: "🚨 CRITICAL: CPU load on {{ $labels.instance }}"
+      description: "CPU load is critically high at {{ $value | humanizePercentage }}"
+      runbook_url: "https://runbook.example.com/cpu-critical"
+
+  # High CPU Load
+  - alert: ProductionHighCPULoad
+    expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+    for: 5m
+    labels:
+      severity: warning
+      component: system
+      environment: production
+    annotations:
+      summary: "⚠️  High CPU load on {{ $labels.instance }}"
+      description: "CPU load is {{ $value | humanizePercentage }}"
+
+  # Critical Memory Usage
+  - alert: ProductionCriticalMemoryUsage
+    expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 95
+    for: 2m
+    labels:
+      severity: critical
+      component: system
+      environment: production
+    annotations:
+      summary: "🚨 CRITICAL: Memory usage on {{ $labels.instance }}"
+      description: "Memory usage is {{ $value | humanizePercentage }}"
+      runbook_url: "https://runbook.example.com/memory-critical"
+
+  # High Memory Usage
+  - alert: ProductionHighMemoryUsage
+    expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+      component: system
+      environment: production
+    annotations:
+      summary: "⚠️  High memory usage on {{ $labels.instance }}"
+      description: "Memory usage is {{ $value | humanizePercentage }}"
+
+  # Critical Disk Usage
+  - alert: ProductionCriticalDiskUsage
+    expr: (node_filesystem_size_bytes{fstype=~"ext4|xfs"} - node_filesystem_free_bytes{fstype=~"ext4|xfs"}) / node_filesystem_size_bytes{fstype=~"ext4|xfs"} * 100 > 95
+    for: 2m
+    labels:
+      severity: critical
+      component: disk
+      environment: production
+    annotations:
+      summary: "🚨 CRITICAL: Disk usage on {{ $labels.instance }}"
+      description: "Disk {{ $labels.mountpoint }} is {{ $value | humanizePercentage }} full"
+      runbook_url: "https://runbook.example.com/disk-critical"
+
+  # High Disk Usage
+  - alert: ProductionHighDiskUsage
+    expr: (node_filesystem_size_bytes{fstype=~"ext4|xfs"} - node_filesystem_free_bytes{fstype=~"ext4|xfs"}) / node_filesystem_size_bytes{fstype=~"ext4|xfs"} * 100 > 85
+    for: 5m
+    labels:
+      severity: warning
+      component: disk
+      environment: production
+    annotations:
+      summary: "⚠️  High disk usage on {{ $labels.instance }}"
+      description: "Disk {{ $labels.mountpoint }} is {{ $value | humanizePercentage }} full"
+
+  # Disk Will Fill In 4 Hours
+  - alert: DiskWillFillSoon
+    expr: predict_linear(node_filesystem_free_bytes{fstype=~"ext4|xfs"}[1h], 4*3600) < 0
+    for: 5m
+    labels:
+      severity: warning
+      component: disk
+      environment: production
+    annotations:
+      summary: "⚠️  Disk {{ $labels.mountpoint }} will fill in 4 hours"
+      description: "Based on current usage patterns, disk will be full in approximately 4 hours"
+
+  # Instance Down
+  - alert: ProductionInstanceDown
+    expr: up{job="node-exporter"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      component: system
+      environment: production
+    annotations:
+      summary: "🚨 CRITICAL: Instance {{ $labels.instance }} is down"
+      description: "Node Exporter on {{ $labels.instance }} has been down for more than 1 minute"
+      runbook_url: "https://runbook.example.com/instance-down"
+
+  # High Load Average
+  - alert: HighLoadAverage
+    expr: node_load5 / count(node_cpu_seconds_total{mode="idle"}) without(cpu, mode) > 2
+    for: 5m
+    labels:
+      severity: warning
+      component: system
+      environment: production
+    annotations:
+      summary: "High load average on {{ $labels.instance }}"
+      description: "Load average is {{ $value }} (threshold: 2x CPU count)"
+
+  # Context Switching High
+  - alert: HighContextSwitching
+    expr: rate(node_context_switches_total[5m]) > 10000
+    for: 10m
+    labels:
+      severity: warning
+      component: system
+      environment: production
+    annotations:
+      summary: "High context switching on {{ $labels.instance }}"
+      description: "Context switching rate is {{ $value }} switches/sec"
+
+  # Network Errors
+  - alert: HighNetworkErrors
+    expr: rate(node_network_receive_errs_total[5m]) + rate(node_network_transmit_errs_total[5m]) > 10
+    for: 5m
+    labels:
+      severity: warning
+      component: network
+      environment: production
+    annotations:
+      summary: "High network errors on {{ $labels.instance }}"
+      description: "Network interface {{ $labels.device }} is experiencing {{ $value }} errors/sec"

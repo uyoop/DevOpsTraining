@@ -1,0 +1,138 @@
+groups:
+- name: service_alerts
+  interval: 1m
+  rules:
+  # Service Down
+  - alert: ServiceDown
+    expr: up == 0
+    for: 1m
+    labels:
+      severity: critical
+      component: service
+      environment: production
+    annotations:
+      summary: "🚨 Service {{ $labels.job }} is down"
+      description: "Service {{ $labels.job }} on {{ $labels.instance }} is not responding"
+      runbook_url: "https://runbook.example.com/service-down"
+
+  # Prometheus Target Down
+  - alert: PrometheusTargetMissing
+    expr: up == 0
+    for: 5m
+    labels:
+      severity: warning
+      component: prometheus
+      environment: production
+    annotations:
+      summary: "Prometheus target {{ $labels.job }} is down"
+      description: "Target has been down for more than 5 minutes"
+
+  # Prometheus Too Many Restarts
+  - alert: PrometheusTooManyRestarts
+    expr: changes(process_start_time_seconds{job=~"prometheus"}[15m]) > 2
+    for: 1m
+    labels:
+      severity: warning
+      component: prometheus
+      environment: production
+    annotations:
+      summary: "Prometheus has restarted more than twice in the last 15 minutes"
+      description: "Prometheus has restarted {{ $value }} times"
+
+  # Prometheus Configuration Reload Failed
+  - alert: PrometheusConfigurationReloadFailure
+    expr: prometheus_config_last_reload_successful != 1
+    for: 1m
+    labels:
+      severity: warning
+      component: prometheus
+      environment: production
+    annotations:
+      summary: "Prometheus configuration reload failed"
+      description: "Configuration reload has failed. Check Prometheus logs."
+
+  # Alertmanager Configuration Reload Failed
+  - alert: AlertmanagerConfigurationReloadFailure
+    expr: alertmanager_config_last_reload_successful != 1
+    for: 1m
+    labels:
+      severity: warning
+      component: alertmanager
+      environment: production
+    annotations:
+      summary: "Alertmanager configuration reload failed"
+      description: "Configuration reload has failed. Check Alertmanager logs."
+
+  # Grafana Down
+  - alert: GrafanaDown
+    expr: up{job="grafana"} == 0
+    for: 2m
+    labels:
+      severity: critical
+      component: grafana
+      environment: production
+    annotations:
+      summary: "🚨 Grafana is down"
+      description: "Grafana service is not responding"
+      runbook_url: "https://runbook.example.com/grafana-down"
+
+  # Loki Down
+  - alert: LokiDown
+    expr: up{job="loki"} == 0
+    for: 2m
+    labels:
+      severity: critical
+      component: loki
+      environment: production
+    annotations:
+      summary: "🚨 Loki is down"
+      description: "Loki service is not responding"
+
+  # HTTP Endpoint Down (Blackbox)
+  - alert: HTTPEndpointDown
+    expr: probe_success == 0
+    for: 2m
+    labels:
+      severity: critical
+      component: blackbox
+      environment: production
+    annotations:
+      summary: "🚨 HTTP endpoint {{ $labels.instance }} is down"
+      description: "Endpoint has been unreachable for more than 2 minutes"
+      runbook_url: "https://runbook.example.com/endpoint-down"
+
+  # HTTP Slow Response
+  - alert: HTTPSlowResponse
+    expr: probe_duration_seconds > 5
+    for: 5m
+    labels:
+      severity: warning
+      component: blackbox
+      environment: production
+    annotations:
+      summary: "HTTP endpoint {{ $labels.instance }} is slow"
+      description: "Response time is {{ $value }}s (threshold: 5s)"
+
+  # SSL Certificate Expiring Soon
+  - alert: SSLCertificateExpiringSoon
+    expr: probe_ssl_earliest_cert_expiry - time() < 7 * 24 * 3600
+    for: 1h
+    labels:
+      severity: warning
+      component: ssl
+      environment: production
+    annotations:
+      summary: "SSL certificate for {{ $labels.instance }} expiring soon"
+      description: "Certificate will expire in {{ $value | humanizeDuration }}"
+
+  # SSL Certificate Expiring Very Soon
+  - alert: SSLCertificateExpiringVerySoon
+    expr: probe_ssl_earliest_cert_expiry - time() < 24 * 3600
+    for: 1h
+    labels:
+      severity: critical
+      component: ssl
+      environment: production
+    annotations:
+      summary: "🚨 SSL certificate for {{ $labels.instance }} expiring in less than 24 hours"
+      description: "Certificate will expire in {{ $value | humanizeDuration }}"

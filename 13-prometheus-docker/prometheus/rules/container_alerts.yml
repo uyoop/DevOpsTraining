@@ -1,0 +1,102 @@
+groups:
+- name: container_alerts
+  interval: 1m
+  rules:
+  # Container Restarting Alert
+  - alert: ContainerRestarting
+    expr: rate(container_last_seen{name!=""}[5m]) > 0 and changes(container_last_seen{name!=""}[10m]) > 2
+    for: 5m
+    labels:
+      severity: warning
+      component: docker
+    annotations:
+      summary: "Container {{ $labels.name }} is restarting"
+      description: "Container {{ $labels.name }} has restarted multiple times in the last 10 minutes"
+
+  # Container High Memory Usage Alert
+  - alert: ContainerHighMemoryUsage
+    expr: (container_memory_usage_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""} * 100) > 80
+    for: 5m
+    labels:
+      severity: warning
+      component: docker
+    annotations:
+      summary: "Container {{ $labels.name }} high memory usage"
+      description: "Container {{ $labels.name }} memory usage is {{ $value | humanizePercentage }}"
+
+  # Container Memory OOM Risk Alert
+  - alert: ContainerMemoryOOMRisk
+    expr: (container_memory_usage_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""} * 100) > 95
+    for: 2m
+    labels:
+      severity: critical
+      component: docker
+    annotations:
+      summary: "Container {{ $labels.name }} at risk of OOM"
+      description: "Container {{ $labels.name }} memory usage is critically high at {{ $value | humanizePercentage }}"
+
+  # Container CPU Throttling Alert
+  - alert: ContainerCPUThrottling
+    expr: rate(container_cpu_cfs_throttled_periods_total{name!=""}[5m]) / rate(container_cpu_cfs_periods_total{name!=""}[5m]) > 0.25
+    for: 5m
+    labels:
+      severity: warning
+      component: docker
+    annotations:
+      summary: "Container {{ $labels.name }} CPU throttling"
+      description: "Container {{ $labels.name }} is being throttled {{ $value | humanizePercentage }} of the time"
+
+  # Container High CPU Usage Alert
+  - alert: ContainerHighCPUUsage
+    expr: rate(container_cpu_usage_seconds_total{name!=""}[1m]) * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+      component: docker
+    annotations:
+      summary: "Container {{ $labels.name }} high CPU usage"
+      description: "Container {{ $labels.name }} CPU usage is {{ $value }}%"
+
+  # Container Absent Alert
+  - alert: ContainerAbsent
+    expr: absent(container_last_seen{name=~"prometheus|node-exporter|cadvisor|alertmanager"})
+    for: 2m
+    labels:
+      severity: critical
+      component: docker
+    annotations:
+      summary: "Critical container is missing"
+      description: "Expected container {{ $labels.name }} is not running"
+
+  # Container Disk I/O High Alert
+  - alert: ContainerHighDiskIO
+    expr: rate(container_fs_writes_bytes_total{name!=""}[5m]) > 10 * 1024 * 1024
+    for: 10m
+    labels:
+      severity: info
+      component: docker
+    annotations:
+      summary: "Container {{ $labels.name }} high disk I/O"
+      description: "Container {{ $labels.name }} is writing {{ $value | humanize }}B/s to disk"
+
+  # Container Network Receive High Alert
+  - alert: ContainerHighNetworkReceive
+    expr: rate(container_network_receive_bytes_total{name!=""}[5m]) > 50 * 1024 * 1024
+    for: 10m
+    labels:
+      severity: info
+      component: docker
+    annotations:
+      summary: "Container {{ $labels.name }} high network receive"
+      description: "Container {{ $labels.name }} is receiving {{ $value | humanize }}B/s"
+
+  # Container Network Transmit High Alert
+  - alert: ContainerHighNetworkTransmit
+    expr: rate(container_network_transmit_bytes_total{name!=""}[5m]) > 50 * 1024 * 1024
+    for: 10m
+    labels:
+      severity: info
+      component: docker
+    annotations:
+      summary: "Container {{ $labels.name }} high network transmit"
+      description: "Container {{ $labels.name }} is transmitting {{ $value | humanize }}B/s"
