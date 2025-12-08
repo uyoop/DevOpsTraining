@@ -2,7 +2,7 @@
 
 Bienvenue dans la formation Docker ! Cette branche contient l'ensemble des travaux pratiques pour maîtriser Docker de A à Z.
 
-## 📚 Liste des TPs (1-18)
+## 📚 Liste des TPs (1-22)
 
 ### Fondamentaux Docker
 | TP | Titre | Focus | Durée | Niveau |
@@ -34,10 +34,20 @@ Bienvenue dans la formation Docker ! Cette branche contient l'ensemble des trava
 | **17** | Portainer Docker (Basique) | Portainer CE, gestion conteneurs/stacks | 1h | Débutant |
 | **18** ⭐ | Portainer Enterprise | Portainer EE, PostgreSQL, GitOps, Traefik, metrics | 3-4h | Avancé/Prod |
 
+### Audit & Qualité d'Image
+| TP | Titre | Focus | Durée | Niveau |
+|----|-------|-------|-------|--------|
+| **20** | Dive Docker | Analyse des layers, optimisation Dockerfile, score d'efficacité | 45 min | Intermédiaire |
+| **21** ⭐ | Dive + Harbor (Ansible) | Audit non interactif, rapports JSON, gating CI/CD | 1h30 | Avancé/Prod |
+| **22** 🧪 | Dive Test Suite | Exercice complet : bad vs good, Dive TUI, comparaison | 2h | Intermédiaire |
+
 ### Projets applicatifs complémentaires
 | TP | Titre | Focus | Dossier |
 |----|-------|-------|---------|
 | **19** | AfpaBike (refonte Dev/DevOps) | Repackaging Docker, refonte DevOps, variante appli corrigée | `19-App-AfpaBike/` (`AB-projet-base`, `AB-Devops-ok`, `AB-App-ok`) |
+| **20** | Dive Docker | Audit d'images local (TUI/CI) | `20-Dive-docker/` |
+| **21** | Dive + Harbor (Ansible) | Audit pro connecté au registry Harbor | `21-Dive-harbor-Docker-pro/` |
+| **22** | Dive Test Suite | Exercice complet avec Dockerfiles bad/good, scripts, Ansible | `22-Dive-test/` |
 
 > Branche `docker` = référence principale des TPs. Dossier `branches/docker/` = snapshot consultable sans changer de branche.
 

@@ -1,0 +1,59 @@
+[
+    {
+        "Id": "sha256:9b2263d4da62fbd101c9c587ed0cb69725e9ebf9e88040719ab6751e1e0865d0",
+        "RepoTags": [
+            "dive-demo:bad"
+        ],
+        "RepoDigests": [
+            "dive-demo@sha256:9b2263d4da62fbd101c9c587ed0cb69725e9ebf9e88040719ab6751e1e0865d0"
+        ],
+        "Comment": "buildkit.dockerfile.v0",
+        "Created": "2025-12-08T16:13:11.503268369+01:00",
+        "Config": {
+            "Env": [
+                "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "DEBIAN_FRONTEND=noninteractive",
+                "FLASK_ENV=development",
+                "APP_ENV=dev",
+                "USE_DEBUG=True"
+            ],
+            "Cmd": [
+                "python3",
+                "app.py"
+            ],
+            "WorkingDir": "/app",
+            "Labels": {
+                "org.opencontainers.image.ref.name": "ubuntu",
+                "org.opencontainers.image.version": "22.04"
+            },
+            "ArgsEscaped": true
+        },
+        "Architecture": "amd64",
+        "Os": "linux",
+        "Size": 751913537,
+        "RootFS": {
+            "Type": "layers",
+            "Layers": [
+                "sha256:73974f74b436f39a2fdb6461b1e3f7c3e41c73325776fa71d16b942a5b4a365b",
+                "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+                "sha256:fddc0dd84c6972ee9bb1b803d138f150d65723243b374ad333d9d5cb0e6b32dd",
+                "sha256:ac50e134628a78ba22060f012308463288896df9b5d7f4a6ad5df9da1fd2c4e8",
+                "sha256:30337e3492d3308b2d9bf841a428fd7062fe979842d2651af042bd38d85661ad",
+                "sha256:270449fbc963ec18b6a37bc05729da0cd9d74c5013541745a15cf49056487ef4",
+                "sha256:76f2bc544209c9b5c601a55c89248690433cac9ddddbd3ef9dbfc7c0b2dc5a17",
+                "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+                "sha256:fe5170661c484178ec72de6c7588726e8386d9960cdf716fa501dbd7441b030c",
+                "sha256:a681fd303793071001279b41175ab9307348b104f6b512d46e5b68736638585e",
+                "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
+            ]
+        },
+        "Metadata": {
+            "LastTagTime": "2025-12-08T15:13:25.398489358Z"
+        },
+        "Descriptor": {
+            "mediaType": "application/vnd.oci.image.index.v1+json",
+            "digest": "sha256:9b2263d4da62fbd101c9c587ed0cb69725e9ebf9e88040719ab6751e1e0865d0",
+            "size": 856
+        }
+    }
+]

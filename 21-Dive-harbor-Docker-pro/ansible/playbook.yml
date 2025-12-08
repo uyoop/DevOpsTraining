@@ -1,0 +1,80 @@
+---
+- name: Install Dive and audit a Harbor image
+  hosts: harbor_bastion
+  become: true
+  vars:
+    dive_version: "0.12.0"
+    dive_arch: "linux_amd64"
+    dive_download_url: "https://github.com/wagoodman/dive/releases/download/v{{ dive_version }}/dive_{{ dive_version }}_{{ dive_arch }}.deb"
+    dive_package_path: "/tmp/dive_{{ dive_version }}_{{ dive_arch }}.deb"
+    report_dir: "/tmp/dive-reports"
+    harbor_host: "harbor.example.com"
+    harbor_project: "demo"
+    harbor_image: "app"
+    harbor_tag: "latest"
+    harbor_username: "admin"
+    harbor_password: "ChangeMe!"
+    lowest_efficiency: 0.90
+  tasks:
+    - name: Ensure dependencies are present
+      apt:
+        name:
+          - ca-certificates
+          - curl
+          - jq
+        state: present
+        update_cache: true
+
+    - name: Download Dive package
+      get_url:
+        url: "{{ dive_download_url }}"
+        dest: "{{ dive_package_path }}"
+        mode: "0644"
+
+    - name: Install Dive
+      apt:
+        deb: "{{ dive_package_path }}"
+        state: present
+
+    - name: Ensure report directory exists
+      file:
+        path: "{{ report_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Docker login to Harbor
+      command: >-
+        docker login {{ harbor_host }}
+        --username {{ harbor_username }}
+        --password {{ harbor_password }}
+      changed_when: "Login Succeeded" in docker_login.stdout if docker_login is defined else true
+      register: docker_login
+
+    - name: Pull target image from Harbor
+      command: >-
+        docker pull {{ harbor_host }}/{{ harbor_project }}/{{ harbor_image }}:{{ harbor_tag }}
+      register: pull_image
+      changed_when: "Downloaded" in pull_image.stdout or "Pull complete" in pull_image.stdout
+
+    - name: Run Dive in CI mode
+      command: >-
+        dive {{ harbor_host }}/{{ harbor_project }}/{{ harbor_image }}:{{ harbor_tag }}
+        --ci
+        --json {{ report_dir }}/dive-report.json
+        --exit-code 1
+        --lowestEfficiency {{ lowest_efficiency }}
+      register: dive_ci
+      failed_when: dive_ci.rc != 0
+
+    - name: Save Dive stdout to text report
+      copy:
+        content: "{{ dive_ci.stdout }}"
+        dest: "{{ report_dir }}/dive-report.txt"
+        mode: "0644"
+
+    - name: Show Dive summary
+      debug:
+        msg:
+          - "Efficiency threshold: {{ lowest_efficiency }}"
+          - "Report JSON: {{ report_dir }}/dive-report.json"
+          - "Report text: {{ report_dir }}/dive-report.txt"

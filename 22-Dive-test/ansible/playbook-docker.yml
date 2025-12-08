@@ -1,0 +1,102 @@
+---
+- name: Install Docker Engine, Compose v2, and Dive
+  hosts: targets
+  become: false
+  vars:
+    docker_packages:
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+    docker_repo_file: "/etc/apt/sources.list.d/docker.list"
+    dive_version: "0.12.0"
+    dive_arch: "linux_amd64"
+    dive_pkg: "dive_{{ dive_version }}_{{ dive_arch }}.deb"
+    dive_url: "https://github.com/wagoodman/dive/releases/download/v{{ dive_version }}/{{ dive_pkg }}"
+    dive_dest: "/tmp/{{ dive_pkg }}"
+    docker_arch_map:
+      x86_64: amd64
+      aarch64: arm64
+      armv7l: armhf
+    docker_arch: "{{ docker_arch_map.get(ansible_architecture, ansible_architecture) }}"
+  tasks:
+    - name: Compute distro id and codename (Debian/Ubuntu)
+      set_fact:
+        docker_distro_id: "{{ 'debian' if ansible_distribution | lower == 'debian' else 'ubuntu' }}"
+        docker_codename: "{{ ansible_lsb.codename | default(ansible_distribution_release) }}"
+
+    - name: Install prerequisite packages
+      apt:
+        name: "{{ docker_packages }}"
+        state: present
+        update_cache: true
+
+    - name: Ensure keyrings dir exists
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Add Docker GPG key
+      get_url:
+        url: "https://download.docker.com/linux/{{ docker_distro_id }}/gpg"
+        dest: /etc/apt/keyrings/docker.gpg
+        mode: "0644"
+
+    - name: Set up Docker repository
+      ansible.builtin.copy:
+        dest: "{{ docker_repo_file }}"
+        mode: "0644"
+        content: |
+          deb [arch={{ docker_arch }} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/{{ docker_distro_id }} {{ docker_codename }} stable
+
+    - name: Install Docker Engine and plugins
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+
+    - name: Ensure docker service is enabled and started
+      systemd:
+        name: docker
+        enabled: true
+        state: started
+
+    - name: Add current user to docker group (non-root usage)
+      user:
+        name: "{{ ansible_env.SUDO_USER | default(ansible_user_id) }}"
+        groups: docker
+        append: true
+      when: ansible_env.SUDO_USER is defined or ansible_user_id != 'root'
+
+    - name: Display docker version
+      command: docker --version
+      register: docker_version
+      changed_when: false
+
+    - debug:
+        msg: "{{ docker_version.stdout }}"
+
+    - name: Download Dive package
+      get_url:
+        url: "{{ dive_url }}"
+        dest: "{{ dive_dest }}"
+        mode: "0644"
+
+    - name: Install Dive
+      apt:
+        deb: "{{ dive_dest }}"
+        state: present
+
+    - name: Display Dive version
+      command: dive --version
+      register: dive_version_out
+      changed_when: false
+
+    - debug:
+        msg: "{{ dive_version_out.stdout }}"
