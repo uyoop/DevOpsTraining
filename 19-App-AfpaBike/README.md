@@ -8,7 +8,7 @@ Organisation des livrables pour l'application AfpaBike.
 - `AB-App-ok/` : copie de base destinée aux corrections complètes (Dev + DevOps) pour rendre l'application fonctionnelle et optimisée.
 
 ## Branche Git
-- Branche de travail : `docker` (changement non encore commité au moment de ce mémo).
+- Branche de travail : `docker` (changements commités et poussés).
 
 ## Actions menées
 - Extraction de l'archive initiale dans `AB-projet-base/`.
