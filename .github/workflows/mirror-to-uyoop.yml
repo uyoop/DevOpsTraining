@@ -1,0 +1,45 @@
+# Mirror all refs (branches, tags, notes) from this repo (CJenkins-AFPA/CJ-DEVOPS)
+# to uyoop/DevOpsTraining. Requires a repository secret TARGET_PAT in the source repo.
+name: Mirror to uyoop/DevOpsTraining
+
+on:
+  push:
+    branches: ['**']
+  schedule:
+    - cron: '0 0 * * *' # daily at 00:00 UTC
+
+concurrency:
+  group: mirror-to-uyoop
+  cancel-in-progress: true
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check mirror period has not expired
+        run: |
+          TODAY=$(date -u +%Y-%m-%d)
+          EXPIRY="2026-06-30"
+          if [[ "$TODAY" > "$EXPIRY" ]]; then
+            echo "Mirror period expired on $EXPIRY (today: $TODAY). Exiting without pushing."
+            exit 0
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Push to mirror (all refs)
+        env:
+          TARGET_REPO: uyoop/DevOpsTraining
+          TARGET_PAT: ${{ secrets.TARGET_PAT }}
+        run: |
+          set -e
+          # Add remote using the PAT and push --mirror (pushes all refs: branches, tags, notes).
+          git remote add mirror "https://x-access-token:${TARGET_PAT}@github.com/${TARGET_REPO}.git"
+          git push --mirror mirror
