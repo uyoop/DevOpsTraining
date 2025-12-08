@@ -7,6 +7,7 @@ on:
     branches: ['**']
   schedule:
     - cron: '0 0 * * *' # daily at 00:00 UTC
+  workflow_dispatch:
 
 concurrency:
   group: mirror-to-uyoop
@@ -15,6 +16,9 @@ concurrency:
 jobs:
   mirror:
     runs-on: ubuntu-latest
+    env:
+      TARGET_REPO: uyoop/DevOpsTraining
+      TARGET_PAT: ${{ secrets.TARGET_PAT }}
     steps:
       - name: Check mirror period has not expired
         run: |
@@ -25,9 +29,21 @@ jobs:
             exit 0
           fi
 
-      - uses: actions/checkout@v4
+      - name: Checkout repository (no persisted credentials)
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false  # important: avoid using GITHUB_TOKEN for other remotes
+
+      - name: Sanity check TARGET_PAT
+        run: |
+          # fail early if the secret is not set
+          if [ -z "${TARGET_PAT}" ]; then
+            echo "TARGET_PAT is not set or is empty. Please add the secret TARGET_PAT in repository settings." >&2
+            exit 1
+          fi
+          # print length of token for debugging (does not reveal the token)
+          echo "TARGET_PAT length: ${#TARGET_PAT}"
 
       - name: Configure git
         run: |
@@ -35,11 +51,10 @@ jobs:
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Push to mirror (all refs)
-        env:
-          TARGET_REPO: uyoop/DevOpsTraining
-          TARGET_PAT: ${{ secrets.TARGET_PAT }}
         run: |
           set -e
-          # Add remote using the PAT and push --mirror (pushes all refs: branches, tags, notes).
+          # Use PAT in remote URL. Ensure TARGET_PAT is non-empty (checked above).
           git remote add mirror "https://x-access-token:${TARGET_PAT}@github.com/${TARGET_REPO}.git"
+          # show the remote URL without token for verification
+          git remote -v
           git push --mirror mirror
