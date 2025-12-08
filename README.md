@@ -9,26 +9,26 @@ Ce dépôt contient l'ensemble de mes projets et travaux pratiques DevOps organi
 ### `main` - Documentation Générale
 Branche principale contenant la documentation d'ensemble et les liens vers les différents projets.
 
-### `docker-compose` - Projets Docker & Docker Compose
+### `docker` - Projets Docker & Docker Compose
 Ensemble de projets utilisant Docker et Docker Compose :
 - Déploiements d'applications web
 - Configurations multi-conteneurs
 - Exemples d'orchestration
 
-### `ansible-automation` - Travaux Pratiques Ansible
+### `ansible` - Travaux Pratiques Ansible
 Projets d'automatisation avec Ansible :
 - Configuration de serveurs
 - Déploiement d'applications web
 - Gestion de l'infrastructure
 - Utilisation de rôles et playbooks
 
-### `vagrant-vms` - Configurations Vagrant
+### `vagrant` - Configurations Vagrant
 Environnements de développement virtualisés :
 - Machines virtuelles Debian
 - Stack LAMP
 - Configurations multi-machines (web/db)
 
-### `uyoop-app` - Application UyoopApp
+### `uyoop` - Application UyoopApp
 Projets relatifs à l'application UyoopApp :
 - Version standard
 - Version dockerisée avec Ansible
@@ -38,10 +38,10 @@ Projets relatifs à l'application UyoopApp :
 Pour travailler sur un projet spécifique, basculez sur la branche correspondante :
 
 ```bash
-git checkout docker-compose     # Projets Docker
-git checkout ansible-automation # TPs Ansible
-git checkout vagrant-vms        # Configurations Vagrant
-git checkout uyoop-app          # Application UyoopApp
+git checkout docker   # Projets Docker
+git checkout ansible  # TPs Ansible
+git checkout vagrant  # Configurations Vagrant
+git checkout uyoop    # Application UyoopApp
 ```
 
 ## 📖 Documentation
