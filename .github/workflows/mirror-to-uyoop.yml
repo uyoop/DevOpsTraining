@@ -27,21 +27,24 @@ jobs:
             exit 0
           fi
         
-      - name: Checkout repository with all branches
+      - name: Checkout repository with all history and branches
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: true
           persist-credentials: false
-
-      - name: Fetch all branches
-        run: |
-          git fetch --all
           
-      - name: Create local tracking branches for all remote branches
+      - name: Fetch all remote branches
+        run: |
+          git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
+          git fetch origin --prune
+
+      - name: Create local tracking branches
         run: |
           for branch in $(git branch -r | grep -v '\->' | grep -v 'HEAD' | sed 's/origin\///'); do
-            git branch --track "$branch" "origin/$branch" 2>/dev/null || true
+            git branch --track "$branch" "origin/$branch" 2>/dev/null || echo "Branch $branch already exists"
           done
+          echo "Local branches:"
           git branch -a
 
       - name: Sanity check TARGET_PAT
