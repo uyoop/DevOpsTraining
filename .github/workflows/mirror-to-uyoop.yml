@@ -27,24 +27,19 @@ jobs:
             exit 0
           fi
         
-      - name: Checkout repository with all history and branches
+      - name: Checkout repository with full history
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          fetch-tags: true
           persist-credentials: false
-          
-      - name: Fetch all remote branches
-        run: |
-          git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
-          git fetch origin --prune
 
-      - name: Create local tracking branches
+      - name: Create local branches from remote branches
         run: |
-          for branch in $(git branch -r | grep -v '\->' | grep -v 'HEAD' | sed 's/origin\///'); do
-            git branch --track "$branch" "origin/$branch" 2>/dev/null || echo "Branch $branch already exists"
+          git branch -r | grep -v '\->' | grep -v 'HEAD' | while read remote; do
+            branch="${remote#origin/}"
+            git branch --track "$branch" "$remote" 2>/dev/null || git branch -f "$branch" "$remote"
           done
-          echo "Local branches:"
+          echo "=== Local branches created ==="
           git branch -a
 
       - name: Sanity check TARGET_PAT
@@ -63,7 +58,6 @@ jobs:
       - name: Add target remote
         run: |
           git remote add target https://oauth2:${TARGET_PAT}@github.com/${TARGET_REPO}.git
-          git remote -v
 
       - name: Mirror push to target
         run: |
