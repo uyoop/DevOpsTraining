@@ -1,13 +1,10 @@
-name: Mirror all refs (branches, tags, notes) from this repo (CJenkins-AFPA/CJ-DEVOPS)
-     to uyoop/DevOpsTraining. Requires repository secret TARGET_PAT in the source repo.
-     
 name: Mirror to uyoop/DevOpsTraining
 
 on:
   push:
     branches: ['**']
   schedule:
-    - cron: '0 8 * * *'  # daily at 08:00 UTC
+    - cron: '0 8 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -26,11 +23,11 @@ jobs:
           EXPIRY="2026-06-30"
           TODAY=$(date -u +%Y-%m-%d)
           if [[ "$TODAY" > "$EXPIRY" ]]; then
-            echo "Mirror period expired on $EXPIRY (today: $TODAY). Exiting without pushing."
+            echo "Mirror period expired on $EXPIRY (today: $TODAY)."
             exit 0
           fi
         
-      - name: Checkout repository (no persisted credentials)
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -39,7 +36,7 @@ jobs:
       - name: Sanity check TARGET_PAT
         run: |
           if [[ -z "$TARGET_PAT" ]]; then
-            echo "TARGET_PAT is not set or is empty. Please add the secret TARGET_PAT in repository settings."
+            echo "TARGET_PAT is not set. Please add the secret."
             exit 1
           fi
           echo "TARGET_PAT length: ${#TARGET_PAT}"
@@ -49,10 +46,9 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Add target remote with authentication
+      - name: Add target remote
         run: |
           git remote add target https://oauth2:${TARGET_PAT}@github.com/${TARGET_REPO}.git
-          git remote -v
 
       - name: Mirror push to target
         run: |
